@@ -73,8 +73,7 @@ def read_uu_sparams(filename):
     """ Read data from cable CSV files and return instance of Sparam class """
     d = np.genfromtxt(filename, skip_header=0, skip_footer=0)
     f = d[:, 0]
-
-    s21 = interp(f, to_complex(d[:,1:3], linear=False, radians=False))
+    s21 = interp(f, to_complex(d[:,3:5], linear=False, radians=False))
     S = Sparam(f, s21=s21)
     return S
 
