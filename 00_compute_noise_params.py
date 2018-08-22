@@ -11,7 +11,7 @@ import pylab as plt
 from scipy.interpolate import interp1d as interp
 import hickle as hkl
 
-from leda_cal2.fileio import read_anritsu_s11, read_cable_sparams, read_s2p_s11, read_spectrum, read_uu_sparams
+from leda_cal2.fileio import read_anritsu_s11, read_cable_sparams, read_s2p_s11, read_spectrum, read_uu_sparams, read_hirose_adapter_sparams
 from leda_cal2.enr import *
 
 # Constants
@@ -215,6 +215,7 @@ if __name__ == "__main__":
     cable_2m  = read_cable_sparams('../leda_analysis_2016/cable.cal.18may/leda.2.0m.cable.and.MS147.18may31.18aug16.s2p.csv')
     cable_uu   = read_uu_sparams('../leda_analysis_2016/cable.cal.18may/leda.UU.cable.and.MS147.18may31.18aug16.s2p.csv')   
         #cable_uu.plot_s21(); plt.show(); exit()	
+    cable_hirose_adapter = read_hirose_adapter_sparams('cal_data/hirose_adapter.csv')
 
     # Load VNA measurements of HP346 and LNA
     """
@@ -234,7 +235,7 @@ if __name__ == "__main__":
    
    
 
-    for antenna in ['252A', '254B', '255A', '254B']:     # 254A out for now
+    for antenna in ['252A', '254A', '254B', '255A', '255B']:     
 
         # Load de-embedded LNA S11 figures
         s2p_lna = read_s2p_s11('../leda_analysis_2016/lna.s11.18may/leda.lna.s11.cable.de-embedded.18aug09.txt', s11_col=col(antenna)) # tong
@@ -244,7 +245,7 @@ if __name__ == "__main__":
     	s2p_ant = read_s2p_s11('../leda_analysis_2016/balun.18may/fialkov.de-embed.baluns.Using.Lab.Measued.Cables.18aug01/Zres_'+antenna+'.s2p', s11_col=1)
 
 	if antenna == "252A":
-
+	    T_amb = 26.8+273.15
 
 	   # Now load uncalibrated spectra corresponding to reference sources
 	    P_2m_open  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.2p0m.OPEN.skypath.2018-05-24_18-17-45.dat')
@@ -270,30 +271,34 @@ if __name__ == "__main__":
 
 	if antenna == "254A":
 
+            T_amb = 33.8+273.15
 
-	   # Now load uncalibrated spectra corresponding to reference sources
-	    P_2m_open  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.OPEN.skypath.2018-05-26_08-03-53.dat')	
-	    P_2m_short  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.SHORT.skypath.2018-05-26_08-05-43.dat')
+	    P_2m_open = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.OPEN.skypath.2018-05-24_13-59-10.dat')
+	    P_2m_short = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.SHORT.skypath.2018-05-24_13-57-22.dat')
 	    P_2m_load = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.49.99o.skypath.2018-05-24_14-03-50.dat')
-	    P_2m_c47   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.47pf.skypath.2018-05-26_08-09-24.dat')
-	    P_2m_c66   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.66pf.skypath.2018-05-26_08-10-21.dat')
-	    P_0p9m_open = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.OPEN.skypath.2018-05-26_08-13-36.dat')
-	    P_0p9m_short = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.SHORT.skypath.2018-05-26_08-16-19.dat')
-            P_0p9m_load = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.49.99o.skypath.2018-05-24_14-15-20.dat')
-	    P_0p9m_c47  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.47pf.skypath.2018-05-26_08-19-32.dat')
-	    P_0p9m_c66  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.66pf.skypath.2018-05-26_08-20-57.dat')
+	    P_2m_c47 = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.47pf.skypath.2018-05-24_14-01-29.dat')
+	    P_2m_c66 = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.66pf.skypath.2018-05-24_14-02-54.dat')
+	    P_0p9m_open = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.OPEN.skypath.2018-05-24_14-09-51.dat')
+	    P_0p9m_short = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.SHORT.skypath.2018-05-24_14-11-13.dat')
+	    P_0p9m_load = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.49.99o.skypath.2018-05-24_14-15-20.dat')
+	    P_0p9m_c47 = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.47pf.skypath.2018-05-24_14-13-04.dat')
+	    P_0p9m_c66 = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.66pf.skypath.2018-05-24_14-14-26.dat')
 
 	    # Load / compute spectra and temperature for hot and ambient reference sources
-	        # LJG NOTE:  Need to refine / correct use of ambient temperatures cs IEEE reference temperature of 290K.
-	    P_hp_hot      = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.yf346-7.on.skypath.2018-05-26_08-24-42.dat')
-	    P_hp_cold      = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.yf346-7.off.skypath.2018-05-26_08-23-46.dat')
+	    # LJG NOTE:  Need to refine / correct use of ambient temperatures cs IEEE reference temperature of 290K.
+	    P_hp_hot = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.yf346-7.on.skypath.2018-05-24_14-22-41.dat')
+	    P_hp_cold = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.yf346-7.off.skypath.2018-05-24_14-21-18.dat')
 
 
-    	    # Load noise diode states - select hot and cold from one of many configurations.
-    	    P_fe_cold  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.TERM.coldpath.2018-05-26_08-07-08.dat')
-    	    P_fe_hot   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.TERM.hotpath.2018-05-26_08-07-08.dat')
+	    # Load noise diode states - select hot and cold from one of many configurations.
+	    P_fe_cold = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.49.99o.coldpath.2018-05-24_14-03-50.dat')
+	    P_fe_hot = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.49.99o.hotpath.2018-05-24_14-03-50.dat')
+
+
 
 	if antenna == "254B":
+
+            T_amb = 31.0+273.15
 
 	     # Now load uncalibrated spectra corresponding to reference sources
 	    P_2m_open  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.2p0m.OPEN.skypath.2018-05-24_15-36-57.dat')
@@ -322,6 +327,9 @@ if __name__ == "__main__":
 
 	if antenna == "255A":
 
+            T_amb = 16.0+273.15
+
+
             # Now load uncalibrated spectra corresponding to reference sources
             """
 	    P_2m_open    = read_spectrum('cal_data/%s/ant_%s.SW0.2p0m.OPEN.skypath.dat'  % (antenna, antenna))
@@ -334,6 +342,7 @@ if __name__ == "__main__":
             P_0p9m_load  = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.TERM.skypath.dat'  % (antenna, antenna))
             P_0p9m_c47   = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.47pf.skypath.dat'  % (antenna, antenna))
             P_0p9m_c66   = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.66pf.skypath.dat'  % (antenna, antenna))"""
+
     	    P_2m_open  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.OPEN.skypath.2018-05-26_08-03-53.dat')
     	    P_2m_short  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.SHORT.skypath.2018-05-26_08-05-43.dat')
 	    P_2m_load    = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.TERM.skypath.2018-05-26_08-07-08.dat')
@@ -366,6 +375,7 @@ if __name__ == "__main__":
 	if antenna == "255B":
 
 
+            T_amb = 23.6+273.15
 
    	    # Now load uncalibrated spectra corresponding to reference sources
     	    P_2m_open  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.2p0m.OPEN.skypath.2018-05-26_09-52-02.dat')
@@ -394,7 +404,7 @@ if __name__ == "__main__":
 
         # Load / compute spectra and temperature for hot and ambient reference sources
         # T_cold, T_hot = generate_T_amb_hot(len(f_mhz))  ## OLD METHOD
-        T_amb = 16+273.15
+        # T_amb above, antenna specific
         L_atten = s21_to_L(-6.95, db=True)			
         L_cable = s21_to_L(cable_uu.s21(f_mhz), db=False)
 	T_hot = hp346c_enr(f_mhz, T_amb=T_amb, L_atten=L_atten, L_cable=L_cable)
@@ -406,13 +416,13 @@ if __name__ == "__main__":
         cable_2m_open    = o.s11(f_mhz) * cable_2m.s21(f_mhz)**2
         cable_2m_short   = s.s11(f_mhz) * cable_2m.s21(f_mhz)**2
         cable_2m_load    = l.s11(f_mhz) * cable_2m.s21(f_mhz)**2
-        cable_2m_c47     = c47.s11(f_mhz) * cable_2m.s21(f_mhz)**2
-        cable_2m_c66     = c66.s11(f_mhz) * cable_2m.s21(f_mhz)**2
+        cable_2m_c47     = c47.s11(f_mhz) * cable_2m.s21(f_mhz)**2 * cable_hirose_adapter.s21(f_mhz)**2
+        cable_2m_c66     = c66.s11(f_mhz) * cable_2m.s21(f_mhz)**2 * cable_hirose_adapter.s21(f_mhz)**2
         cable_0p9m_open  = o.s11(f_mhz) * cable_0p9m.s21(f_mhz)**2
         cable_0p9m_short = s.s11(f_mhz) * cable_0p9m.s21(f_mhz)**2
         cable_0p9m_load  = l.s11(f_mhz) * cable_0p9m.s21(f_mhz)**2
-        cable_0p9m_c47   = c47.s11(f_mhz) * cable_0p9m.s21(f_mhz)**2
-        cable_0p9m_c66   = c66.s11(f_mhz) * cable_0p9m.s21(f_mhz)**2
+        cable_0p9m_c47   = c47.s11(f_mhz) * cable_0p9m.s21(f_mhz)**2 * cable_hirose_adapter.s21(f_mhz)**2
+        cable_0p9m_c66   = c66.s11(f_mhz) * cable_0p9m.s21(f_mhz)**2 * cable_hirose_adapter.s21(f_mhz)**2
 
         # Compute reflection coefficients for these
         GM_lna  = s2p_lna.s11(f_mhz)
@@ -524,7 +534,7 @@ if __name__ == "__main__":
         ###########################
         ##    PLOTTING ROUTINES  ##
         ###########################
-"""
+
         # Plot FE noise diode temps
         plt.figure("Noise diode temps")
         plt.plot(f_mhz, T_fe_cold)
@@ -575,7 +585,7 @@ if __name__ == "__main__":
             plt.ylabel("Temperature [K]")
             plt.xlabel("Frequency [MHz]")
         plt.savefig("img/NOISEWAVE_%s.png" % antenna)
-        plt.show()
+        #plt.show()
 
         d = {'f_mhz': f_mhz,
             'T_H': T_fe_hot,
@@ -588,4 +598,4 @@ if __name__ == "__main__":
 
 
         hkl.dump(d, 'cal_data_%s.hkl' % antenna)
-"""
+
