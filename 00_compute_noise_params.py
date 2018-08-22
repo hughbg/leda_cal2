@@ -585,7 +585,7 @@ if __name__ == "__main__":
             plt.ylabel("Temperature [K]")
             plt.xlabel("Frequency [MHz]")
         plt.savefig("img/NOISEWAVE_%s.png" % antenna)
-        #plt.show()
+        plt.show()
 
         d = {'f_mhz': f_mhz,
             'T_H': T_fe_hot,
