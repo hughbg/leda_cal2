@@ -155,121 +155,242 @@ def apply_calibration(P_3ss, T_fe_hot, T_fe_cold,
     T_sky = (1.0 / G_S) * (A * P_3ss + B)
     return T_sky
 
+def col(ant):
+    x252a_col = 1
+    x252b_col = 3
+    x254a_col = 5
+    x254b_col = 7
+    x255a_col = 9
+    x255b_col = 11
+    x256b_col = 13
+
+    switcher = { "252A": x252a_col,
+	"252B" : x252b_col,
+	"254A" : x254a_col,
+	"254B" : x254b_col,
+	"255A" : x255a_col,
+	"255B" : x255b_col,
+	"256B" : x256b_col
+    }
+
+    return switcher[ant]
+
+
 if __name__ == "__main__":
 
-    for antenna in ['252A', '254A', '255A', '254B']:
-
-        # Set frequency ranges to interpolate data onto
-        #f_mhz = np.linspace(30, 87.5, 201)
-        f_mhz = np.arange(0, 4096) * 0.024
-        f0, f1 = 30, 87.6
-        i0 = np.argmin(np.abs(f_mhz - f0))
-        i1 = np.argmin(np.abs(f_mhz - f1))
-        f_mhz = f_mhz[i0:i1]
-
-        testpoint = 'SW0'
-
-
-        ###################################
-        ##   READ VNA AND SPECTRUM DATA  ##
-        ###################################
-
-        # Load open/short/load/capacitor reflection coefficients
-        """
-	c47 = read_anritsu_s11('cal_data/c47pF_0702.csv')
-        c66 = read_anritsu_s11('cal_data/c66pF_0702.csv')
-        o   = read_anritsu_s11('cal_data/open0702.csv')
-        s   = read_anritsu_s11('cal_data/short0702.csv')
-        l   = read_anritsu_s11('cal_data/R50p9_0702.csv')"""
-   	c47 = read_anritsu_s11('cal_data/c47pF_0702.csv')
-    	c66 = read_anritsu_s11('cal_data/c66pF_0702.csv')
-    	o  = read_anritsu_s11('cal_data/open0702.csv')
-    	s  = read_anritsu_s11('cal_data/short0702.csv')
-    	l  = read_anritsu_s11('cal_data/R50p9_0702.csv')
+    # Set frequency ranges to interpolate data onto
+    #f_mhz = np.linspace(30, 87.5, 201)
+    f_mhz = np.arange(0, 4096) * 0.024
+    f0, f1 = 30, 87.6
+    i0 = np.argmin(np.abs(f_mhz - f0))
+    i1 = np.argmin(np.abs(f_mhz - f1))
+    f_mhz = f_mhz[i0:i1]
 
 
 
-        # Read cable s-params
-        """
-        cable_0p9m = read_cable_sparams('cal_data/cable_0p9.csv')
-        cable_2m   = read_cable_sparams('cal_data/cable_2m.csv')"""
-    	cable_0p9m = read_cable_sparams('../leda_analysis_2016/cable.cal.18may/leda.0p9m.cable.and.MS147.18may31.18aug16.s2p.csv')
-    	cable_2m  = read_cable_sparams('../leda_analysis_2016/cable.cal.18may/leda.2.0m.cable.and.MS147.18may31.18aug16.s2p.csv')
-        cable_uu   = read_uu_sparams('../leda_analysis_2016/cable.cal.18may/leda.UU.cable.and.MS147.18may31.18aug16.s2p.csv')   
+    ###################################
+    ##   READ VNA AND SPECTRUM DATA  ##
+    ###################################
+
+    # Load open/short/load/capacitor reflection coefficients
+    """
+    c47 = read_anritsu_s11('cal_data/c47pF_0702.csv')
+    c66 = read_anritsu_s11('cal_data/c66pF_0702.csv')
+    o   = read_anritsu_s11('cal_data/open0702.csv')
+    s   = read_anritsu_s11('cal_data/short0702.csv')
+    l   = read_anritsu_s11('cal_data/R50p9_0702.csv')"""
+    c47 = read_anritsu_s11('cal_data/c47pF_0702.csv')
+    c66 = read_anritsu_s11('cal_data/c66pF_0702.csv')
+    o  = read_anritsu_s11('cal_data/open0702.csv')
+    s  = read_anritsu_s11('cal_data/short0702.csv')
+    l  = read_anritsu_s11('cal_data/R50p9_0702.csv')
+
+
+
+    # Read cable s-params
+    """
+    cable_0p9m = read_cable_sparams('cal_data/cable_0p9.csv')
+    cable_2m   = read_cable_sparams('cal_data/cable_2m.csv')"""
+    cable_0p9m = read_cable_sparams('../leda_analysis_2016/cable.cal.18may/leda.0p9m.cable.and.MS147.18may31.18aug16.s2p.csv')
+    cable_2m  = read_cable_sparams('../leda_analysis_2016/cable.cal.18may/leda.2.0m.cable.and.MS147.18may31.18aug16.s2p.csv')
+    cable_uu   = read_uu_sparams('../leda_analysis_2016/cable.cal.18may/leda.UU.cable.and.MS147.18may31.18aug16.s2p.csv')   
         #cable_uu.plot_s21(); plt.show(); exit()	
 
-        # Load VNA measurements of HP346 and LNA
-        """
-	s2p_lna  = read_s2p_s11('cal_data/%s/%s.lna.rl.s2p' % (antenna, antenna))
-        s2p_hot  = read_s2p_s11('cal_data/346-7bw3.on.s11.s2p')
-        s2p_cold = read_s2p_s11('cal_data/346-7bw3.off.s11.s2p')"""
-        # Read Antenna S11
-        #s2p_ant = read_s2p_s11('cal_data/%s/%s.ant.rl.s2p' % (antenna, antenna), s11_col=1)
+    # Load VNA measurements of HP346 and LNA
+    """
+    s2p_lna  = read_s2p_s11('cal_data/%s/%s.lna.rl.s2p' % (antenna, antenna))
+    s2p_hot  = read_s2p_s11('cal_data/346-7bw3.on.s11.s2p')
+    s2p_cold = read_s2p_s11('cal_data/346-7bw3.off.s11.s2p')"""
+    # Read Antenna S11
+    #s2p_ant = read_s2p_s11('cal_data/%s/%s.ant.rl.s2p' % (antenna, antenna), s11_col=1)
 
         # Load Keysight 346B noise source S11 values
 
-    	s2p_hot = read_s2p_s11('cal_data/346-7bw3.on.s11.s2p')
-    	s2p_cold = read_s2p_s11('cal_data/346-7bw3.off.s11.s2p')
+    s2p_hot = read_s2p_s11('cal_data/346-7bw3.on.s11.s2p')
+    s2p_cold = read_s2p_s11('cal_data/346-7bw3.off.s11.s2p')
 
     # LNA S11 values are in specific columns in the file 
         # leda_analysis_2016/lna.s11.18may/leda.lna.s11.cable.de-embedded.18aug09.txt
    
-    	x252a_col = 1
-    	x252b_col = 3
-    	x254a_col = 5
-    	x254b_col = 7
-    	x255a_col = 9
-    	x255b_col = 11
-    	x256b_col = 13
- 
-       # Load de-embedded LNA S11 figures
-    	s2p_lna = read_s2p_s11('../leda_analysis_2016/lna.s11.18may/leda.lna.s11.cable.de-embedded.18aug09.txt', s11_col=x255a_col) # tong
+   
+
+    for antenna in ['252A', '254B', '255A', '254B']:     # 254A out for now
+
+        # Load de-embedded LNA S11 figures
+        s2p_lna = read_s2p_s11('../leda_analysis_2016/lna.s11.18may/leda.lna.s11.cable.de-embedded.18aug09.txt', s11_col=col(antenna)) # tong
 
       # Read balun S11 measurements
         # HG NOTE:  Conversion from AF impedance figures.
-    	s2p_ant = read_s2p_s11('../leda_analysis_2016/balun.18may/fialkov.de-embed.baluns.Using.Lab.Measued.Cables.18aug01/Zres_255A.s2p', s11_col=1)
+    	s2p_ant = read_s2p_s11('../leda_analysis_2016/balun.18may/fialkov.de-embed.baluns.Using.Lab.Measued.Cables.18aug01/Zres_'+antenna+'.s2p', s11_col=1)
 
-        # Now load uncalibrated spectra corresponding to reference sources
-        """
-	P_2m_open    = read_spectrum('cal_data/%s/ant_%s.SW0.2p0m.OPEN.skypath.dat'  % (antenna, antenna))
-        P_2m_short   = read_spectrum('cal_data/%s/ant_%s.SW0.2p0m.SHORT.skypath.dat' % (antenna, antenna))
-        P_2m_load    = read_spectrum('cal_data/%s/ant_%s.SW0.2p0m.TERM.skypath.dat' % (antenna, antenna))
-        P_2m_c47     = read_spectrum('cal_data/%s/ant_%s.SW0.2p0m.47pf.skypath.dat'  % (antenna, antenna))
-        P_2m_c66     = read_spectrum('cal_data/%s/ant_%s.SW0.2p0m.66pf.skypath.dat'  % (antenna, antenna))
-        P_0p9m_open  = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.OPEN.skypath.dat'  % (antenna, antenna))
-        P_0p9m_short = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.SHORT.skypath.dat' % (antenna, antenna))
-        P_0p9m_load  = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.TERM.skypath.dat'  % (antenna, antenna))
-        P_0p9m_c47   = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.47pf.skypath.dat'  % (antenna, antenna))
-        P_0p9m_c66   = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.66pf.skypath.dat'  % (antenna, antenna))"""
-
-    	P_2m_open  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.OPEN.skypath.2018-05-26_08-03-53.dat')
-    	P_2m_short  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.SHORT.skypath.2018-05-26_08-05-43.dat')
-	P_2m_load    = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.TERM.skypath.2018-05-26_08-07-08.dat')
-    	P_2m_c47   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.47pf.skypath.2018-05-26_08-09-24.dat')
-    	P_2m_c66   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.66pf.skypath.2018-05-26_08-10-21.dat')
-    	P_0p9m_open = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.0p9m.OPEN.skypath.2018-05-26_08-13-36.dat')
-    	P_0p9m_short = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.0p9m.SHORT.skypath.2018-05-26_08-16-19.dat')
-        P_0p9m_load   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.0p9m.TERM.skypath.2018-05-26_08-17-42.dat')
-    	P_0p9m_c47  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.0p9m.47pf.skypath.2018-05-26_08-19-32.dat')
-    	P_0p9m_c66  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.0p9m.66pf.skypath.2018-05-26_08-20-57.dat')
+	if antenna == "252A":
 
 
-        # Load HP noise source spectra
-        """
-	P_hp_hot      = read_spectrum('cal_data/%s/ant_%s.SW0.yf346-7.on.skypath.dat' % (antenna, antenna))
-        P_hp_cold     = read_spectrum('cal_data/%s/ant_%s.SW0.yf346-7.off.skypath.dat' % (antenna, antenna))"""
+	   # Now load uncalibrated spectra corresponding to reference sources
+	    P_2m_open  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.2p0m.OPEN.skypath.2018-05-24_18-17-45.dat')
+	    P_2m_short  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.2p0m.SHORT.skypath.2018-05-24_18-16-24.dat')
+	    P_2m_load = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.2p0m.TERM.skypath.2018-05-24_18-19-35.dat')
+	    P_2m_c47   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.2p0m.47pf.skypath.2018-05-24_18-21-27.dat')
+	    P_2m_c66   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.2p0m.66pf.skypath.2018-05-24_18-22-50.dat')
+	    P_0p9m_open = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.0p9m.OPEN.skypath.2018-05-24_18-32-08.dat')
+	    P_0p9m_short = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.0p9m.SHORT.skypath.2018-05-24_18-30-16.dat')
+	    P_0p9m_load = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.0p9m.TERM.skypath.2018-05-24_18-33-32.dat')
+	    P_0p9m_c47  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.0p9m.47pf.skypath.2018-05-24_18-35-22.dat')
+	    P_0p9m_c66  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.0p9m.66pf.skypath.2018-05-24_18-36-46.dat')
 
-    	P_hp_hot      = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.yf346-7.on.skypath.2018-05-26_08-24-42.dat')
-    	P_hp_cold      = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.yf346-7.off.skypath.2018-05-26_08-23-46.dat')
+	    # Load / compute spectra and temperature for hot and ambient reference sources
+	        # LJG NOTE:  Need to refine / correct use of ambient temperatures cs IEEE reference temperature of 290K.
+	    P_hp_hot      = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.yf346-7.on.skypath.2018-05-24_18-40-30.dat')
+	    P_hp_cold      = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.yf346-7.off.skypath.2018-05-24_18-39-07.dat')
 
 
-        # Load noise diode states
-        """
-	P_fe_cold    = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.OPEN.coldpath.dat' % (antenna, antenna))
-        P_fe_hot     = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.OPEN.hotpath.dat'  % (antenna, antenna))"""
+    	    # Load noise diode states - select hot and cold from one of many configurations.
+    	    P_fe_cold  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.2p0m.TERM.coldpath.2018-05-24_18-19-35.dat')
+    	    P_fe_hot   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/252a/ant_252A.SW0.2p0m.TERM.hotpath.2018-05-24_18-19-35.dat')
 
-    	P_fe_cold  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.TERM.coldpath.2018-05-26_08-07-08.dat')
-    	P_fe_hot   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.TERM.hotpath.2018-05-26_08-07-08.dat')
+	if antenna == "254A":
+
+
+	   # Now load uncalibrated spectra corresponding to reference sources
+	    P_2m_open  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.OPEN.skypath.2018-05-26_08-03-53.dat')	
+	    P_2m_short  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.SHORT.skypath.2018-05-26_08-05-43.dat')
+	    P_2m_load = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.49.99o.skypath.2018-05-24_14-03-50.dat')
+	    P_2m_c47   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.47pf.skypath.2018-05-26_08-09-24.dat')
+	    P_2m_c66   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.66pf.skypath.2018-05-26_08-10-21.dat')
+	    P_0p9m_open = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.OPEN.skypath.2018-05-26_08-13-36.dat')
+	    P_0p9m_short = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.SHORT.skypath.2018-05-26_08-16-19.dat')
+            P_0p9m_load = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.49.99o.skypath.2018-05-24_14-15-20.dat')
+	    P_0p9m_c47  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.47pf.skypath.2018-05-26_08-19-32.dat')
+	    P_0p9m_c66  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.0p9m.66pf.skypath.2018-05-26_08-20-57.dat')
+
+	    # Load / compute spectra and temperature for hot and ambient reference sources
+	        # LJG NOTE:  Need to refine / correct use of ambient temperatures cs IEEE reference temperature of 290K.
+	    P_hp_hot      = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.yf346-7.on.skypath.2018-05-26_08-24-42.dat')
+	    P_hp_cold      = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.yf346-7.off.skypath.2018-05-26_08-23-46.dat')
+
+
+    	    # Load noise diode states - select hot and cold from one of many configurations.
+    	    P_fe_cold  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.TERM.coldpath.2018-05-26_08-07-08.dat')
+    	    P_fe_hot   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254a/ant_254A.SW0.2p0m.TERM.hotpath.2018-05-26_08-07-08.dat')
+
+	if antenna == "254B":
+
+	     # Now load uncalibrated spectra corresponding to reference sources
+	    P_2m_open  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.2p0m.OPEN.skypath.2018-05-24_15-36-57.dat')
+	    P_2m_short  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.2p0m.SHORT.skypath.2018-05-24_16-00-32.dat')
+	    P_2m_load = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.2p0m.TERM.skypath.2018-05-24_16-02-49.dat')
+ 	    P_2m_c47   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.2p0m.47pf.skypath.2018-05-24_16-05-06.dat')
+	    P_2m_c66   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.2p0m.66pf.skypath.2018-05-24_16-06-28.dat')
+	    P_0p9m_open = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.0p9m.OPEN.skypath.2018-05-24_16-12-55.dat')
+	    P_0p9m_short = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.0p9m.SHORT.skypath.2018-05-24_16-15-15.dat')
+	    P_0p9m_load = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.0p9m.TERM.skypath.2018-05-24_16-17-03.dat')
+	    P_0p9m_c47  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.0p9m.47pf.skypath.2018-05-24_16-18-57.dat')
+	    P_0p9m_c66  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.0p9m.66pf.skypath.2018-05-24_16-19-56.dat')
+
+	    # Load / compute spectra and temperature for hot and ambient reference sources
+	        # LJG NOTE:  Need to refine / correct use of ambient temperatures cs IEEE reference temperature of 290K.
+	    P_hp_hot      = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.yf346-7.on.skypath.2018-05-24_16-23-51.dat')
+	    P_hp_cold      = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.yf346-7.off.skypath.2018-05-24_16-22-54.dat')
+
+
+	    # Load noise diode states - select hot and cold from one of many configurations.
+	    P_fe_cold  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.2p0m.TERM.coldpath.2018-05-24_16-02-49.dat')
+	    P_fe_hot   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/254b/ant_254B.SW0.2p0m.TERM.hotpath.2018-05-24_16-02-49.dat')
+
+
+
+
+	if antenna == "255A":
+
+            # Now load uncalibrated spectra corresponding to reference sources
+            """
+	    P_2m_open    = read_spectrum('cal_data/%s/ant_%s.SW0.2p0m.OPEN.skypath.dat'  % (antenna, antenna))
+            P_2m_short   = read_spectrum('cal_data/%s/ant_%s.SW0.2p0m.SHORT.skypath.dat' % (antenna, antenna))
+            P_2m_load    = read_spectrum('cal_data/%s/ant_%s.SW0.2p0m.TERM.skypath.dat' % (antenna, antenna))
+            P_2m_c47     = read_spectrum('cal_data/%s/ant_%s.SW0.2p0m.47pf.skypath.dat'  % (antenna, antenna))
+            P_2m_c66     = read_spectrum('cal_data/%s/ant_%s.SW0.2p0m.66pf.skypath.dat'  % (antenna, antenna))
+            P_0p9m_open  = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.OPEN.skypath.dat'  % (antenna, antenna))
+            P_0p9m_short = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.SHORT.skypath.dat' % (antenna, antenna))
+            P_0p9m_load  = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.TERM.skypath.dat'  % (antenna, antenna))
+            P_0p9m_c47   = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.47pf.skypath.dat'  % (antenna, antenna))
+            P_0p9m_c66   = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.66pf.skypath.dat'  % (antenna, antenna))"""
+    	    P_2m_open  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.OPEN.skypath.2018-05-26_08-03-53.dat')
+    	    P_2m_short  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.SHORT.skypath.2018-05-26_08-05-43.dat')
+	    P_2m_load    = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.TERM.skypath.2018-05-26_08-07-08.dat')
+    	    P_2m_c47   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.47pf.skypath.2018-05-26_08-09-24.dat')
+    	    P_2m_c66   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.66pf.skypath.2018-05-26_08-10-21.dat')
+    	    P_0p9m_open = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.0p9m.OPEN.skypath.2018-05-26_08-13-36.dat')
+    	    P_0p9m_short = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.0p9m.SHORT.skypath.2018-05-26_08-16-19.dat')
+            P_0p9m_load   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.0p9m.TERM.skypath.2018-05-26_08-17-42.dat')
+    	    P_0p9m_c47  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.0p9m.47pf.skypath.2018-05-26_08-19-32.dat')
+    	    P_0p9m_c66  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.0p9m.66pf.skypath.2018-05-26_08-20-57.dat')
+
+
+            # Load HP noise source spectra
+            """
+	    P_hp_hot      = read_spectrum('cal_data/%s/ant_%s.SW0.yf346-7.on.skypath.dat' % (antenna, antenna))
+            P_hp_cold     = read_spectrum('cal_data/%s/ant_%s.SW0.yf346-7.off.skypath.dat' % (antenna, antenna))"""
+
+    	    P_hp_hot      = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.yf346-7.on.skypath.2018-05-26_08-24-42.dat')
+    	    P_hp_cold      = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.yf346-7.off.skypath.2018-05-26_08-23-46.dat')
+
+
+            # Load noise diode states
+            """
+	    P_fe_cold    = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.OPEN.coldpath.dat' % (antenna, antenna))
+            P_fe_hot     = read_spectrum('cal_data/%s/ant_%s.SW0.0p9m.OPEN.hotpath.dat'  % (antenna, antenna))"""
+
+    	    P_fe_cold  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.TERM.coldpath.2018-05-26_08-07-08.dat')
+    	    P_fe_hot   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255a/ant_255A.SW0.2p0m.TERM.hotpath.2018-05-26_08-07-08.dat')
+
+	if antenna == "255B":
+
+
+
+   	    # Now load uncalibrated spectra corresponding to reference sources
+    	    P_2m_open  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.2p0m.OPEN.skypath.2018-05-26_09-52-02.dat')
+    	    P_2m_short  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.2p0m.SHORT.skypath.2018-05-26_09-53-55.dat')
+	    P_2m_load = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.2p0m.TERM.skypath.2018-05-26_09-55-20.dat')
+    	    P_2m_c47   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.2p0m.47pf.skypath.2018-05-26_09-57-42.dat')
+    	    P_2m_c66   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.2p0m.66pf.skypath.2018-05-26_09-58-38.dat')
+    	    P_0p9m_open = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.0p9m.OPEN.skypath.2018-05-26_10-02-47.dat')
+    	    P_0p9m_short = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.0p9m.SHORT.skypath.2018-05-26_10-05-07.dat')
+	    P_0p9m_load = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.0p9m.TERM.skypath.2018-05-26_10-07-00.dat')
+    	    P_0p9m_c47  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.0p9m.47pf.skypath.2018-05-26_10-08-52.dat')
+    	    P_0p9m_c66  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.0p9m.66pf.skypath.2018-05-26_10-10-47.dat')
+
+    	    # Load / compute spectra and temperature for hot and ambient reference sources
+            # LJG NOTE:  Need to refine / correct use of ambient temperatures cs IEEE reference temperature of 290K.
+	    P_hp_hot      = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.YF.on.skypath.2018-05-26_10-24-27.dat')
+            P_hp_cold      = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.YF.off.skypath.2018-05-26_10-23-32.dat')
+
+
+            # Load noise diode states - select hot and cold from one of many configurations.
+            P_fe_cold  = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.2p0m.TERM.coldpath.2018-05-26_09-55-20.dat')
+            P_fe_hot   = read_spectrum('../leda_analysis_2016/npcal/npcal.data.collected/255b/ant_255B.SW0.2p0m.TERM.hotpath.2018-05-26_09-55-20.dat')
+
+
+
 
         # Load / compute spectra and temperature for hot and ambient reference sources
         # T_cold, T_hot = generate_T_amb_hot(len(f_mhz))  ## OLD METHOD
@@ -278,8 +399,7 @@ if __name__ == "__main__":
         L_cable = s21_to_L(cable_uu.s21(f_mhz), db=False)
 	T_hot = hp346c_enr(f_mhz, T_amb=T_amb, L_atten=L_atten, L_cable=L_cable)
         T_cold = np.ones_like(f_mhz) * T_amb
-
-	T_cold, T_hot = generate_T_amb_hot(len(f_mhz))
+        #T_cold, T_hot = generate_T_amb_hot(len(f_mhz))
 
 
         # Compute reflection coefficient for cable + O/S/L standards
@@ -404,7 +524,7 @@ if __name__ == "__main__":
         ###########################
         ##    PLOTTING ROUTINES  ##
         ###########################
-
+"""
         # Plot FE noise diode temps
         plt.figure("Noise diode temps")
         plt.plot(f_mhz, T_fe_cold)
@@ -468,3 +588,4 @@ if __name__ == "__main__":
 
 
         hkl.dump(d, 'cal_data_%s.hkl' % antenna)
+"""
