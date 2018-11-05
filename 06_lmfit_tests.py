@@ -179,7 +179,7 @@ if __name__ == "__main__":
     nighttime_only = True	# If True will also exclude daytime LSTs
 
     # Read all the hickle files, which must be listed in the file "file_list.txt".
-    # Accumulate usable the spectra in a big array.
+    # Accumulate usable spectra in a big array.
     for line in open("file_list.txt"):
       f = line[:-1]
       data = hickle.load(f)
@@ -236,7 +236,8 @@ f2 = np.ma.array(f2, mask=rD.mask).compressed()
 rD = rD.compressed()
 
 # ------------ Step 2: Fit a damped sinusoid
-
+# You can fit a sin function by using the fit_model_sin_off and model_sin_pff functions above
+# instead of the damped functions.
 
 rD_model_params = fit_model_damped_sin(f2, rD)
 rD_sin_model    = model_damped(f2, rD_model_params)
