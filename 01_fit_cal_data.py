@@ -2,7 +2,7 @@ import hickle as hkl
 from leda_cal2.fileio import *
 import pylab as plt
 
-for ant_id in ['252A', '254A', '255A', '254B']:
+for ant_id in ['252A', '254A', '255A', '254B', '255B']:
     a = hkl.load('cal_data_%s.hkl' % ant_id)
 
     print a.keys()
