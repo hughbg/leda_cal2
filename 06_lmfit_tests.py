@@ -192,22 +192,28 @@ def plot_spans(acc_data, fl, d):
 
   print
 
+# If residual=True then do the polynomial and damped sinusoid
+# fit and subtraction.
+# This routine generates all the images that go in the movie.
+# The movie is created with shell script "make_movie"
 def make_movie_spectra(acc_data, freq, fl, d, residual=False):
+
   if acc_data.shape[1] != len(freq):
     raise("Invalid number of frequencies")
   if acc_data.shape[0] != len(d):
-    raise("Days not the same as number of LSTs")
+    raise("Days array not the same length as number of LSTs")
 
   print "Making movie images"
 
   mean_spectrum = np.ma.mean(acc_data, axis=0)
-
+  np.savetxt("mean_spectrum.dat", mean_spectrum)
 
   import sys
 
   plt.clf()
   plt.figure(figsize=(20,14))
 
+  # Loop through the data making a plot of each spectrum
   for i in range(acc_data.shape[0]):
     if i in flags: continue
 
@@ -215,17 +221,19 @@ def make_movie_spectra(acc_data, freq, fl, d, residual=False):
       print i, "...",
       sys.stdout.flush()
   
-    try:
+    try:	# Sometimes fitting may crash
       if residual:
+	# Subtract polynomial and damped sin
         data = acc_data[i]-poly_fit(freq, acc_data[i], n_poly)
-        rD_model_params = fit_model_sin_off(freq, data)
-        data = data-model_sin_off(freq, rD_model_params)
+        rD_model_params = fit_model_damped_sin(freq, data)
+        data = data-model_damped(freq, rD_model_params)
       else: data = acc_data[i]
     except:
       data = [ 0 for i in range(acc_data.shape[1]) ]
 
     plt.clf()
     plt.plot(freq, data, linewidth=0.5)
+    np.savetxt("spec"+str(i)+".dat", np.array(list(zip(freq, data))))
     if not residual: plt.plot(frequencies, mean_spectrum, linewidth=0.8)
     plt.ylabel("Temperature")
     plt.xlabel("Frequency [MHz]")
@@ -341,21 +349,36 @@ if __name__ == "__main__":
 
 print "Num spectra", accumulated_data.shape[0]
 
+# These lines chop above 85MHz because April data doesn't have that for real.
+# Uncomment these lines for April data
 accumulated_data = accumulated_data[:, :2292]
 frequencies = frequencies[:2292]
 
+# Load a list of flags from flagged_times.dat. These are just sequence
+# numbers relating specifically to the time order of the loaded spectra
+# e.g as you would see in the movie "6 of 1000" so use the number 6 to 
+# flag that one.
 flags = load_flags()
 for i in flags:
   accumulated_data.mask[i, :] = True
 accumulated_data[:, 410].mask = True; accumulated_data[:, 846].mask = True
 
+# This removes below 40MHz and removes the Nan border created by the flagging routines.
 accumulated_data = accumulated_data[:, 417:-16]
 frequencies = frequencies[417:-16]
 
-#make_movie_spectra(accumulated_data, frequencies, flags, days)
+# These three routines do specific things - all visualizations.
+make_movie_spectra(accumulated_data, frequencies, flags, days, residual=True)
 #plot_spans(accumulated_data, flags, days)
 #plot_waterfall(accumulated_data, frequencies, flags, days)
-#exit()
+exit()
+
+# The rest of the code does:
+# 1. Average the data
+# 2. Fit and subtract polynomial
+# 3. Fit and subtract damped sin
+# 4. Show the result
+# Also saves a few things on the way.
 
 np.savetxt("accumulated_data.dat", np.ma.filled(accumulated_data, -1))
 
@@ -392,8 +415,8 @@ rD = rD.compressed()
 # ------------ Step 2: Fit a damped sinusoid
 
 
-rD_model_params = fit_model_sin_off(f2, rD)
-rD_sin_model    = model_sin_off(f2, rD_model_params)
+rD_model_params = fit_model_damped_sin(f2, rD)
+rD_sin_model    = model_damped(f2, rD_model_params)
 
 # Plot the residual and damped sinusoid fit
 
