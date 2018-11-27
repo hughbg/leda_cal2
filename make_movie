@@ -1,0 +1,67 @@
+#!/bin/sh
+make_movie() {
+	size="600"
+	replicated=4
+	file_type=png
+
+	header() {
+		echo "PATTERN I"
+		echo "OUTPUT movie.mpg"
+		echo "BASE_FILE_FORMAT PPM"
+		echo "INPUT_CONVERT *"
+		echo "GOP_SIZE $1"
+		echo "SLICES_PER_FRAME 1"
+		echo "INPUT_DIR $2"
+		echo "INPUT"
+	}
+
+	footer() {
+		echo "END_INPUT"
+		echo "PIXEL HALF"
+		echo "RANGE 10"
+		echo "PSEARCH_ALG LOGARITHMIC"
+		echo "BSEARCH_ALG CROSS2"
+		echo "IQSCALE 8"
+		echo "PQSCALE 10"
+		echo "BQSCALE 25"
+		echo "FRAME_RATE 24"
+		echo "REFERENCE_FRAME ORIGINAL"
+	}
+
+
+	# Convert files to ppm
+	echo "Converting files"
+	echo `ls spec*.${file_type} | wc | awk '{print $1}'` "${file_type} files"
+	for f in `ls -rt spec*.${file_type}`
+	do
+		convert $f  /mnt/md0/run/`echo $f | sed s/"\.[^\.]*$"//`.ppm
+	done
+
+	# Calculate number of frames
+	num=`ls /mnt/md0/run/*.ppm | wc | awk '{print $1}'`
+	num=`echo "$num * $replicated" | bc`
+
+	# Create param file
+	echo "Creating param file"
+
+	header $num /mnt/md0/run > param_file
+	for f in `ls -rt /mnt/md0/run/*.ppm`
+	do
+		i=0
+	
+		while [ $i -lt $replicated ]
+		do 
+			echo `basename $f` >> param_file
+			i=`echo "$i + 1" | bc`
+		done
+	done
+
+	footer >> param_file
+
+	# Make the movie
+	echo "Making movie"
+	ppmtompeg param_file > /dev/null
+	rm /mnt/md0/run/*.ppm
+}
+
+make_movie
