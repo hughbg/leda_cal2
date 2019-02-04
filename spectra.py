@@ -139,6 +139,8 @@ class Spectra(object):
         if "time_index" in self.flags[self.days[i]].keys():
           if int(self.indexes[i]) in self.flags[self.days[i]]["time_index"]: flags.append(i)
 
+    flags = sorted(flags)
+
     # Apply global channel flags
     if "Channels" in self.flags.keys():
       for ch in self.flags["Channels"]: 
