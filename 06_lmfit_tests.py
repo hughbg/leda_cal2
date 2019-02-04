@@ -13,6 +13,7 @@ import scipy.signal
 import random
 from scipy.interpolate import interp1d as interp
 import hickle, os
+from spectra import Spectra
 
 from lmfit import minimize, Parameters, fit_report
 
@@ -76,12 +77,13 @@ def model_damped(x, params):
     w_0 = params["w_0"].value
     w_1 = params["w_1"].value
     w_2 = params["w_2"].value
+    a = params["a"].value
     b = params["b"].value
     c = params["c"].value
     d = params["d"].value
-    e = params["e"].value
     f = params["f"].value
-    mm = w_0 + w_1*(x-70) + w_2*(x-70)**2+(e**(-x))*b*np.sin(c*x+d+f/x)
+	# w params from Lincoln
+    mm = w_0 + w_1*(x-70) + w_2*(x-70)**2+(a**(-x))*b*np.sin(c*x+d+f/x)   # Get better fit with e^-x where e variable
     return mm
 
 def fit_model_sin(x, data):
@@ -108,8 +110,6 @@ def fit_model_sin_u(x, data):
         print "%08s: %2.4f" % (param, val)
     return outvals
 
-
-
 def fit_model_sin_off(x, data):
     params = Parameters()
     params.add('PHI', value=0.3398, vary=True)
@@ -129,10 +129,10 @@ def fit_model_damped_sin(x, data):
     params.add("w_1", vary=True, value=0.5)
     params.add("w_2", vary=True, value=0.07)
 
+    params.add("a", value=1.0, vary=True)
     params.add("b", value=np.abs(data[0]), vary=True)
     params.add("c", value=1.0, vary=True)
     params.add("d", value=0.0, vary=True)
-    params.add("e", value=1.0, vary=True)
     params.add("f", value=0.0, vary=True)
     out = minimize(residual, params, args=(x, model_damped, data))
     outvals = out.params
@@ -192,58 +192,114 @@ def plot_spans(acc_data, fl, d):
 
   print
 
-# If residual=True then do the polynomial and damped sinusoid
-# fit and subtraction.
+
 # This routine generates all the images that go in the movie.
 # The movie is created with shell script "make_movie"
-def make_movie_spectra(acc_data, freq, fl, d, residual=False):
+def make_movie_spectra(acc_data, freq, d, l, indexes, ant):
 
   if acc_data.shape[1] != len(freq):
     raise("Invalid number of frequencies")
   if acc_data.shape[0] != len(d):
-    raise("Days array not the same length as number of LSTs")
+    raise("Days array not the same length as number of spectra")
+  if acc_data.shape[0] != len(d):
+    raise("Days array not the same length as number of spectra")
+  if acc_data.shape[0] != len(indexes):
+    raise("Index array not the same length as number of spectra")
 
   print "Making movie images"
 
+  lowf = min(freq)
+  highf = max(freq)
+
   mean_spectrum = np.ma.mean(acc_data, axis=0)
   np.savetxt("mean_spectrum.dat", mean_spectrum)
-
+  
   import sys
 
   plt.clf()
   plt.figure(figsize=(20,14))
 
+  poly_coeff_file = open("poly_coeff.txt", "w")
+  damped_sin_coeff_file = open("damped_sin_coeff.txt", "w")
+
   # Loop through the data making a plot of each spectrum
   for i in range(acc_data.shape[0]):
-    if i in flags: continue
 
-    if i%100 == 0: 
-      print i, "...",
-      sys.stdout.flush()
-  
-    try:	# Sometimes fitting may crash
-      if residual:
-	# Subtract polynomial and damped sin
-        data = acc_data[i]-poly_fit(freq, acc_data[i], n_poly)
-        rD_model_params = fit_model_damped_sin(freq, data)
-        data = data-model_damped(freq, rD_model_params)
-      else: data = acc_data[i]
+    print i, "-----"
+
+    #if i%100 == 0: 
+    #  print i, "...",
+    #  sys.stdout.flush()
+
+    # Make sure all nans are masked
+    data = acc_data[i]
+    data.mask = np.logical_or(acc_data[i].mask, np.isnan(acc_data[i]))
+
+    # Need to get rid of masked values 
+    short_freq = np.ma.array(freq, mask=data.mask).compressed()
+    data = data.compressed()
+
+    try:		# Fits can fail
+      poly_values, poly_coeff = poly_fit(short_freq, data, n_poly, print_fit=False)		
+      after_poly = data-poly_values
+      damped_fit = fit_model_damped_sin(short_freq, after_poly)
+      damped = model_damped(short_freq, damped_fit)
     except:
-      data = [ 0 for i in range(acc_data.shape[1]) ]
+      poly_values = [ 0 for j in range(len(short_freq)) ]
+      after_poly = [ 0 for j in range(len(short_freq)) ]
+      damped =[ 0 for j in range(len(short_freq)) ]
+      poly_coeff = damped_fit = []
 
     plt.clf()
-    plt.plot(freq, data, linewidth=0.5)
-    np.savetxt("spec"+str(i)+".dat", np.array(list(zip(freq, data))))
-    if not residual: plt.plot(frequencies, mean_spectrum, linewidth=0.8)
+    #plt.subplot(2, 1, 1)
+    plt.plot(short_freq, data, linewidth=0.5, label="This Spectrum")
+    plt.plot(freq, mean_spectrum, linewidth=0.5, label="Mean Spectrum")
+    #plt.plot(short_freq, poly_values, linewidth=0.5, label="Polynomial Fit")
+    plt.ylabel("Temperature")
+    plt.xlim(lowf, highf)
+    plt.ylim(ymin=0, ymax=10000)
+    plt.legend()
+    if len(poly_coeff) == 0:
+      plt.text(58, 6000, "Poly fit failed\n")
+      poly_coeff_file.write("Poly fit failed\n")
+    else:
+      pstr = ""
+      for j, p in enumerate(poly_coeff):
+        pstr += "p"+str(j)+": %.2e  " % p
+      plt.text(58, 6000, "Poly coeff  "+pstr)
+      poly_coeff_file.write(pstr+"\n")
+ 
+    plt.title("#"+str(i)+"  "+d[i]+", "+str(indexes[i])+"  LST "+( "%.2f" % l[i] )+", Ant "+ant)
+    """
+    plt.subplot(2, 1, 2)
     plt.ylabel("Temperature")
     plt.xlabel("Frequency [MHz]")
-    if residual: plt.ylim(-200, 300)
-    else: plt.ylim(ymin=0, ymax=10000)
-    
-    plt.title(str(i)+" of "+str(acc_data.shape[0])+".  "+d[i])
-    plt.savefig("spec"+str(i)+".png")
+    plt.xlim(lowf, highf)
+    plt.ylim(-300, 300)
+    plt.plot(short_freq, after_poly, linewidth=0.5, label="This spectrum minus polynomial")
+    plt.plot(short_freq, damped, "g", linewidth=0.5, label="Damped Sin Fit")
+    plt.legend()
+    pstr = ""
+    if len(damped_fit) == 0:
+      plt.text(46, -290, "Damped fit failed")
+      damped_sin_coeff_file.write("Damped fit failed")
+    else:
+      for param, val in damped_fit.items():
+        pstr += "%s: %.2e   " % (param, val)
+      plt.text(46, -290, "Damped sin coeff  "+pstr)
+      damped_sin_coeff_file.write(pstr+"\n")
+    """
+    plt.savefig("spec"+str(i)+".png"); 
+
+    np.savetxt("spec"+str(i)+".dat", np.array(list(zip(short_freq, data))))
+    np.savetxt("subtract_poly"+str(i)+".dat", np.array(list(zip(short_freq, after_poly))))
+    np.savetxt("damped_model"+str(i)+".dat", np.array(list(zip(short_freq, damped))))
 
   print
+
+  poly_coeff_file.close()
+  damped_sin_coeff_file.close()
+
 
 def plot_waterfall(acc_data, freq, fl, d):
   import sys
@@ -286,91 +342,25 @@ def plot_waterfall(acc_data, freq, fl, d):
 
   print
 
-def load_flags():
-  if os.path.exists("flagged_times"):
-    # Remove times we don't want to use. Flags
-    # must be the index of the data in the current run.
-    flags = []
-    for line in open("flagged_times.dat"):
-      l = line.split("-")
-      if len(l) == 2:
-        flags += range(int(l[0]), int(l[1])+1)
-      elif len(l) == 1: flags.append(int(l[0]))
-      else:
-        print "Bad format in flags\n";
-        exit(1)
-
-  else: flags = []
-
-  return flags
-
-if __name__ == "__main__":
-    import argparse
-    p = argparse.ArgumentParser(description='Plot antenna spectra and residuals')
-    p.add_argument('-n',  '--n_poly', help='number of terms in log-poly to fit for residuals. Default 5', type=int,  default=3)
-    args = p.parse_args()
-
-    n_poly = args.n_poly
-
-    # Set some important parameters in the next few lines
-    ant = "254A"
-
-    # Read all the hickle files, which must be listed in the file "file_list.txt".
-    # Accumulate usable the spectra in a big array.
-
-    days = []
-    for line in open("file_list.txt"):
-      f = line[:-1]
-      data = hickle.load(f)
- 
-      for key in sorted(data.keys()): 
-        if key == "frequencies": frequencies = data[key]
-            
-        if key == ant:
-          ant_data = data[key]
-
-      # Select the spectra that are usable (based on LST)
-      print "File", line[:-1], ant_data.shape[0], "spectra"
-      days += [ os.path.basename(f)[11:21] ]*ant_data.shape[0]
-
-      # Add them to the big array
-      try: 
-        accumulated_data = np.ma.append(accumulated_data, ant_data, axis=0)
-      except:
-        accumulated_data = ant_data
-
-    # Calculate diffs of all the spectra from the mean
-    #mean_spectra = np.ma.mean(accumulated_data, axis=0)
-    #for i in range(accumulated_data.shape[0]):
-    #  print i, np.std(mean_spectra-accumulated_data[i])
-    #exit()
 
 
+import argparse
+p = argparse.ArgumentParser(description='Plot antenna spectra and residuals')
+p.add_argument('-n',  '--n_poly', help='number of terms in log-poly to fit for residuals. Default 5', type=int,  default=3)
+args = p.parse_args()
 
-print "Num spectra", accumulated_data.shape[0]
+n_poly = args.n_poly
 
-# These lines chop above 85MHz because April data doesn't have that for real.
-# Uncomment these lines for April data
-accumulated_data = accumulated_data[:, :2292]
-frequencies = frequencies[:2292]
+ant = "254A"
 
-# Load a list of flags from flagged_times.dat. These are just sequence
-# numbers relating specifically to the time order of the loaded spectra
-# e.g as you would see in the movie "6 of 1000" so use the number 6 to 
-# flag that one.
-flags = load_flags()
-for i in flags:
-  accumulated_data.mask[i, :] = True
-accumulated_data[:, 410].mask = True; accumulated_data[:, 846].mask = True
-
-# This removes below 40MHz and removes the Nan border created by the flagging routines.
-accumulated_data = accumulated_data[:, 417:-16]
-frequencies = frequencies[417:-16]
+spectra = Spectra("file_list.txt", "flag_db.txt", ant)
+accumulated_data, frequencies, lsts, days, indexes = spectra.good_data()
+print accumulated_data.shape[0], "spectra"; exit()
 
 # These three routines do specific things - all visualizations.
-make_movie_spectra(accumulated_data, frequencies, flags, days, residual=True)
-#plot_spans(accumulated_data, flags, days)
-#plot_waterfall(accumulated_data, frequencies, flags, days)
+make_movie_spectra(accumulated_data, frequencies, days, lsts, indexes, ant)
+#plot_spans(accumulated_data, days)
+#plot_waterfall(accumulated_data, frequencies, days)
 exit()
 
 # The rest of the code does:
@@ -381,6 +371,8 @@ exit()
 # Also saves a few things on the way.
 
 np.savetxt("accumulated_data.dat", np.ma.filled(accumulated_data, -1))
+hickle.dump(accumulated_data, "accumulated_data.hkl")
+
 
 rms = np.zeros(accumulated_data.shape[1])
 for i in range(accumulated_data.shape[1]):
@@ -396,14 +388,14 @@ f2 = frequencies
 np.savetxt("data.dat", np.array(list(zip(f2, aD))))
 filt = aD.compressed()-scipy.signal.medfilt(aD.compressed(), 9)
 filt = filt[9:-9]
-print "Noise", np.std(filt)
+print "Noise", np.std(filt[filt.shape[0]/2:])
 np.savetxt("rms.dat", np.array(list(zip(f2, rms))))
 
 
 # ------------ Step 1: Fit a polynomial or power law and subtract to get residual rD 
 
 # This line fits the polynomial:
-rD = aD - poly_fit(f2, aD, n_poly)	
+rD = aD - poly_fit(f2, aD, n_poly)[0]	
 
 # This line fits a power law:
 #rD = aD-spectral_index_fit(f2, aD)
