@@ -3,7 +3,6 @@ import hickle, os
 import random
 import scipy.signal
 import scipy.optimize
-import json
 
 # Find the spectral index just by curve fitting
 def spectral_index(freq, temp):
@@ -31,9 +30,11 @@ class Spectra(object):
     # Accumulate usable the spectra in a big array.
     random.seed()
 
-    self.days = []
-    self.indexes = []
-    self.lsts = []
+    self.days = []					# Generate a file name day/time for each spectrum - many spectra will have the same one (on the same day)
+    self.indexes = np.zeros(0, dtype=np.int)		# Just sequence number indexes into the original h5 file
+    self.lsts = np.zeros(0)				# LSTs
+    self.dtv_times = np.zeros(0, dtype=np.bool)		# Times where DTV was detected and flagged
+
     for index, line in enumerate(open(fname)):
       if line[0] == "#": continue
 
@@ -44,8 +45,10 @@ class Spectra(object):
         if key == "frequencies": self.frequencies = data[key]
         if key == "lsts": 
           day_lsts = data[key]
-          use_lst_indexes = np.arange(data[key].shape[0])[np.logical_and(data[key]>=lst_min, data[key]<=lst_max)]
+          use_lst_indexes = np.arange(data[key].shape[0])[np.logical_and(data[key]>=lst_min, data[key]<=lst_max)]    # List of indexes of lsts within the limits
         if key == "indexes": day_indexes = data[key]
+        if key == ant+"_dtv_times": 
+          dtv_times = data[key]
 
         if key == ant:
           ant_data = data[key]
@@ -53,11 +56,22 @@ class Spectra(object):
       if len(day_indexes) != len(day_lsts):
         raise RuntimeError("Indexes and LSTs not same length in "+f)
 
-      ant_data = np.ma.array(ant_data[use_lst_indexes], mask=ant_data.mask[use_lst_indexes])
+
+      # Turn the DTV times into an array like a mask, indicating the times, then 
+      # its is the length of the data, like the other arrays: lsts, indexes etc.
+      # dtv_times are a list of indexes (absolute) in the file.
+      zeros = np.full(ant_data.shape[0], False, dtype=np.bool)
+      zeros[[ i for i in range(len(day_indexes)) if day_indexes[i] in dtv_times ]] = True
+      dtv_times = zeros
+
+      # Strip out unwanted LST
+
+      ant_data = np.ma.array(ant_data[use_lst_indexes], mask=ant_data.mask[use_lst_indexes])	# lst_min to lst_max
    
       self.days += [ os.path.basename(f)[11:-4] ]*ant_data.shape[0]		# Every spectrum gets a day tag
       self.lsts = np.append(self.lsts, day_lsts[use_lst_indexes])
       self.indexes = np.append(self.indexes, day_indexes[use_lst_indexes])
+      self.dtv_times = np.append(self.dtv_times, dtv_times[use_lst_indexes])
 
       # Add them to the big array
       try: 
@@ -65,18 +79,14 @@ class Spectra(object):
       except:
         self.accumulated_data = ant_data
 
-      print "File", index, line[:-1], ant_data.shape[0], "spectra", "starts", self.accumulated_data.shape[0]-ant_data.shape[0], "ends", self.accumulated_data.shape[0]
-
+      print "File", index, line[:-1], ant_data.shape[0], "spectra", "starts", self.accumulated_data.shape[0]-ant_data.shape[0], "ends", self.accumulated_data.shape[0], "LST", self.lsts[0], "-", self.lsts[-1]
 
     # These lines chop above 85MHz because April data doesn't have that for real.
     # Uncomment these lines for April data
     self.accumulated_data = self.accumulated_data[:, :2292]
     self.frequencies = self.frequencies[:2292]
 
-    # Load a list of flags from flagged_times.dat. These are just sequence
-    # numbers relating specifically to the time order of the loaded spectra
-    # e.g as you would see in the movie "6 of 1000" so use the number 6 to 
-    # flag that one.
+    # Load the flag database.
     self.flags = self.load_flags(flag_fname)
 
     # This removes below 40MHz
@@ -85,8 +95,8 @@ class Spectra(object):
 
     self.days = np.array(self.days)
 
-    if len(self.days) != len(self.lsts) or len(self.days) != len(self.indexes):
-      raise RuntimeError("Days, LSTs, indexes not all same length")
+    if len(self.days) != len(self.lsts) or len(self.days) != len(self.indexes) or len(self.days) != len(self.dtv_times):
+      raise RuntimeError("Days, LSTs, indexes not all same length "+str(len(self.days))+" "+str(len(self.lsts))+" "+str(len(self.indexes))+" "+str(len(self.dtv_times)))
 
 
   def load_flags_old(self, fname):
@@ -132,14 +142,16 @@ class Spectra(object):
 
 
   def good_data(self):
-    # Generate sequential flag indexes for the data that was loaded
+    # Generate flag indexes (from flag database) to match data that was loaded
     flags = []
     for i in range(len(self.days)):
       if self.days[i] in self.flags.keys():
         if "time_index" in self.flags[self.days[i]].keys():
           if int(self.indexes[i]) in self.flags[self.days[i]]["time_index"]: flags.append(i)
 
-    flags = sorted(flags)
+    # Include dtv times
+    for index in np.nonzero(self.dtv_times)[0]:
+      flags.append(index)
 
     # Apply global channel flags
     if "Channels" in self.flags.keys():
@@ -147,7 +159,27 @@ class Spectra(object):
         self.accumulated_data[:, ch].mask = True
 
     not_flagged = np.delete(np.arange(self.accumulated_data.shape[0]), flags)
+
     return self.accumulated_data[not_flagged], self.frequencies, self.lsts[not_flagged], self.days[not_flagged], self.indexes[not_flagged]
+
+  def bad_data(self):
+    # Generate flag indexes (from flag database) to match data that was loaded
+    flags = []
+    for i in range(len(self.days)):
+      if self.days[i] in self.flags.keys():
+        if "time_index" in self.flags[self.days[i]].keys():
+          if int(self.indexes[i]) in self.flags[self.days[i]]["time_index"]: flags.append(i)
+
+    # Include dtv times
+    for index in np.nonzero(self.dtv_times)[0]:
+      flags.append(index)
+
+    # Apply global channel flags
+    if "Channels" in self.flags.keys():
+      for ch in self.flags["Channels"]: 
+        self.accumulated_data[:, ch].mask = True
+
+    return self.accumulated_data[flags], self.frequencies, self.lsts[flags], self.days[flags], self.indexes[flags]
 
   def all_data(self):
     not_flagged = np.delete(np.arange(self.accumulated_data.shape[0]), self.flags)
@@ -169,19 +201,16 @@ class Spectra(object):
 
   def random_sample(self, num):
 
-    not_flagged = np.delete(np.arange(self.accumulated_data.shape[0]), self.flags)
-    if num > len(not_flagged):
-      raise RuntimError("Asked to select more spectra than exist unflagged in the data")   
-    elif num == len(not_flagged):
-      selected = not_flagged
+    good, b, c, d, e = self.good_data()
+    if num > good.shape[0]:
+      raise RuntimeError("Asked to select "+str(num)+" spectra. There are only "+str(len(good))+".")   
     else:
-      selected = random.sample(not_flagged, num)
+      selected = random.sample(np.arange(good.shape[0]), num)
 
-    return self.accumulated_data[selected]	# Preserves mask
+    return good[selected]	# Preserves mask
 
 
 
-#spectra = Spectra("file_list.txt", "flagged_times.txt", "254A")
-#for i in spectra.flags:
-#  print i, spectra.days[i], int(spectra.indexes[i])
+#spectra = Spectra("file_list1.txt", "flag_db.txt", "254A")
+#spectra.good_data()
 

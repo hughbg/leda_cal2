@@ -240,7 +240,7 @@ def make_movie_spectra(acc_data, freq, d, l, indexes, ant):
     data = data.compressed()
 
     try:		# Fits can fail
-      poly_values, poly_coeff = poly_fit(short_freq, data, n_poly, print_fit=False)		
+      poly_values, poly_coeff = poly_fit(short_freq, data, n_poly, print_fit=False)
       after_poly = data-poly_values
       damped_fit = fit_model_damped_sin(short_freq, after_poly)
       damped = model_damped(short_freq, damped_fit)
@@ -251,26 +251,26 @@ def make_movie_spectra(acc_data, freq, d, l, indexes, ant):
       poly_coeff = damped_fit = []
 
     plt.clf()
-    #plt.subplot(2, 1, 1)
+    plt.subplot(2, 1, 1)
     plt.plot(short_freq, data, linewidth=0.5, label="This Spectrum")
     plt.plot(freq, mean_spectrum, linewidth=0.5, label="Mean Spectrum")
-    #plt.plot(short_freq, poly_values, linewidth=0.5, label="Polynomial Fit")
+    plt.plot(short_freq, poly_values, linewidth=0.5, label="Polynomial Fit")
     plt.ylabel("Temperature")
     plt.xlim(lowf, highf)
     plt.ylim(ymin=0, ymax=10000)
     plt.legend()
     if len(poly_coeff) == 0:
       plt.text(58, 6000, "Poly fit failed\n")
-      poly_coeff_file.write("Poly fit failed\n")
+      poly_coeff_file.write(str(i)+" "+d[i]+" "+str(indexes[i])+" Poly fit failed\n")
     else:
-      pstr = ""
+      pstr = "" 
       for j, p in enumerate(poly_coeff):
         pstr += "p"+str(j)+": %.2e  " % p
       plt.text(58, 6000, "Poly coeff  "+pstr)
-      poly_coeff_file.write(pstr+"\n")
+      poly_coeff_file.write(str(i)+" "+d[i]+" "+str(indexes[i])+" "+pstr+"\n")
  
     plt.title("#"+str(i)+"  "+d[i]+", "+str(indexes[i])+"  LST "+( "%.2f" % l[i] )+", Ant "+ant)
-    """
+    
     plt.subplot(2, 1, 2)
     plt.ylabel("Temperature")
     plt.xlabel("Frequency [MHz]")
@@ -279,16 +279,16 @@ def make_movie_spectra(acc_data, freq, d, l, indexes, ant):
     plt.plot(short_freq, after_poly, linewidth=0.5, label="This spectrum minus polynomial")
     plt.plot(short_freq, damped, "g", linewidth=0.5, label="Damped Sin Fit")
     plt.legend()
-    pstr = ""
     if len(damped_fit) == 0:
-      plt.text(46, -290, "Damped fit failed")
-      damped_sin_coeff_file.write("Damped fit failed")
+      plt.text(50, -290, "Damped fit failed")
+      damped_sin_coeff_file.write(str(i)+" "+d[i]+" "+str(indexes[i])+" Damped fit failed\n")
     else:
+      pstr = ""
       for param, val in damped_fit.items():
         pstr += "%s: %.2e   " % (param, val)
-      plt.text(46, -290, "Damped sin coeff  "+pstr)
-      damped_sin_coeff_file.write(pstr+"\n")
-    """
+      plt.text(42, -290, "Damped sin coeff  "+pstr)
+      damped_sin_coeff_file.write(str(i)+" "+d[i]+" "+str(indexes[i])+" "+pstr+"\n")
+    
     plt.savefig("spec"+str(i)+".png"); 
 
     np.savetxt("spec"+str(i)+".dat", np.array(list(zip(short_freq, data))))
@@ -353,9 +353,9 @@ n_poly = args.n_poly
 
 ant = "254A"
 
-spectra = Spectra("file_list.txt", "flag_db.txt", ant)
+spectra = Spectra("file_list.txt", "flag_db.txt", ant, lst_min=11, lst_max=12)
 accumulated_data, frequencies, lsts, days, indexes = spectra.good_data()
-print accumulated_data.shape[0], "spectra"; exit()
+print accumulated_data.shape[0], "spectra"
 
 # These three routines do specific things - all visualizations.
 make_movie_spectra(accumulated_data, frequencies, days, lsts, indexes, ant)

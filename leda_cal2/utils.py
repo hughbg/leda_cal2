@@ -56,9 +56,9 @@ def poly_fit(x, y, n=5, log=True, print_fit=False):
     p = np.poly1d(fit)
 
     if log:
-        return 10**(p(x_g))
+        return 10**(p(x_g)), fit
     else:
-        return p(x_g)
+        return p(x_g), fit
 
 def fourier_fit(x, n_predict, n_harmonics):
     """ Fit a Fourier series to data
