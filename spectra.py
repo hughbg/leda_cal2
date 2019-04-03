@@ -23,8 +23,32 @@ def spectral_index(freq, temp):
 
 
 class Spectra(object):
+  """
+  A class used to extract radiometry spectra from multiple hickle files, organize them, 
+  and remove flagged spectra. Spectra can be flagged out in two ways:
+
+  1. By specifying them in a flag file. Spectra are uniquely identified by the h5 file
+    they reside in, and their array index number within that file. This unique identification
+    is used to specify spectra to ignore (flag). See flag_db.txt for current flags.
+  2. Any spectrum that has been DTV flagged can be flagged out. That is done
+    automatically by good_data().
+
+  Normally you would create a Spectra object and call good_data() - that's all.
+  """
 
   def __init__(self, fname, flag_fname, ant, lst_min=0, lst_max=24):		# Expects to use all the data it is given except for flags
+    """
+        fname : str
+            The name of a file containing hickle file names, one hickle file per line. Those files will be loaded.
+        flag_fname: str
+	    The name of the flag file. See flag_db.txt for an example of flagging. 
+            The name can be the empty string if there are no flags.
+        ant: str
+	    Which antenna to get data for. Like "254A".
+        lst_min, lst_max: float
+            Restrict the data to LSTs in this range.
+
+    """
 
     # Read all the hickle files, which must be listed in the file "file_list.txt".
     # Accumulate usable the spectra in a big array.
@@ -100,7 +124,7 @@ class Spectra(object):
 
 
   def load_flags_old(self, fname):
-    if os.path.exists(fname):
+    if len(fname) > 0 and os.path.exists(fname):
       # Remove times we don't want to use. Flags
       # must be the index of the data in the current run.
       flags = []
@@ -142,6 +166,37 @@ class Spectra(object):
 
 
   def good_data(self):
+    """
+        This is the workhorse. You will be supplied with an array of spectra containing
+        all the data in the hickle files, in time order, with flagging, and extra
+	information like LSTs will be supplied.
+
+        Returns 5 values
+        ----------------
+        accumulated_data : numpy 2-D array
+            An array of all the spectra in time order. First dimension is time,
+	    second dimension is the channels.
+        frequencies: float array
+	    An array listing all the frequencies (MHz) for the channels. Same
+	    length as the second dimension of accumulated_data.
+        lsts: float array
+	    The LSTs for every spectra in accumulated_data. lsts[i]
+	    is the LST for spectrum accumulated_data[i]. "lsts" has
+	    the same length as the first dimension of accumulated_data.
+        days: array of strings
+            The day/time on which every spectra were recorded.
+	    days[i] is the day/time for spectrum accumulated_data[i]. "days" has
+            the same length as the first dimension of accumulated_data.
+        indexes: integer array
+            For all spectra, the index within the h5 file where the spectrum is located.
+	    indexes[i] is the index for spectrum accumulated_data[i]. days[i] together
+            with indexes[i] uniquely specify where the spectrum accumulated_data[i] 
+            is located - the h5 file, and the array index within that file.
+            "indexes" has the same length as the first dimension of accumulated_data.
+
+
+    """
+
     # Generate flag indexes (from flag database) to match data that was loaded
     flags = []
     for i in range(len(self.days)):
@@ -174,15 +229,9 @@ class Spectra(object):
     for index in np.nonzero(self.dtv_times)[0]:
       flags.append(index)
 
-    # Apply global channel flags
-    if "Channels" in self.flags.keys():
-      for ch in self.flags["Channels"]: 
-        self.accumulated_data[:, ch].mask = True
-
     return self.accumulated_data[flags], self.frequencies, self.lsts[flags], self.days[flags], self.indexes[flags]
 
   def all_data(self):
-    not_flagged = np.delete(np.arange(self.accumulated_data.shape[0]), self.flags)
     return self.accumulated_data, self.frequencies, self.lsts, self.days, self.indexes
 
   def flatten(self):
