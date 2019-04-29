@@ -123,17 +123,17 @@ def fit_model_sin_off(x, data):
         print "%08s: %2.4f" % (param, val)
     return outvals
 
-def fit_model_damped_sin(x, data):
+def fit_model_damped_sin(x, data, previous_params):
     params = Parameters()
-    params.add("w_0", vary=True, value=-1.5)
-    params.add("w_1", vary=True, value=0.5)
-    params.add("w_2", vary=True, value=0.07)
+    params.add("w_0", vary=True, value=previous_params["w_0"])
+    params.add("w_1", vary=True, value=previous_params["w_1"])
+    params.add("w_2", vary=True, value=previous_params["w_2"])
 
-    params.add("a", value=1.0, vary=True)
-    params.add("b", value=np.abs(data[0]), vary=True)
-    params.add("c", value=1.0, vary=True)
-    params.add("d", value=0.0, vary=True)
-    params.add("f", value=0.0, vary=True)
+    params.add("a", value=previous_params["a"], vary=True)
+    params.add("b", value=previous_params["b"], vary=True)
+    params.add("c", value=previous_params["c"], vary=True)
+    params.add("d", value=previous_params["d"], vary=True)
+    params.add("f", value=previous_params["f"], vary=True)
     out = minimize(residual, params, args=(x, model_damped, data))
     outvals = out.params
     for param, val in out.params.items():
@@ -214,18 +214,23 @@ def make_movie_spectra(acc_data, freq, d, l, indexes, ant):
   mean_spectrum = np.ma.mean(acc_data, axis=0)
   np.savetxt("mean_spectrum.dat", mean_spectrum)
   
+  previous_damped_params = { "w_0": -1.5, "w_1": 0.5, "w_2": 0.07, "a": 1.0, "b": -4e5, "c": 1.0, "d": 0.0, "f": 0.0 }
+   
   import sys
 
   plt.clf()
   plt.figure(figsize=(20,14))
+  plt.rcParams.update({'font.size': 22})
 
+  spec_index_file = open("spec_index.dat", "w")
   poly_coeff_file = open("poly_coeff.txt", "w")
   damped_sin_coeff_file = open("damped_sin_coeff.txt", "w")
 
   # Loop through the data making a plot of each spectrum
   for i in range(acc_data.shape[0]):
 
-    print i, "-----"
+    print i, indexes[i], "-----"
+    spec_index_file.write(str(i)+" "+str(indexes[i])+"\n")
 
     #if i%100 == 0: 
     #  print i, "...",
@@ -242,37 +247,40 @@ def make_movie_spectra(acc_data, freq, d, l, indexes, ant):
     try:		# Fits can fail
       poly_values, poly_coeff = poly_fit(short_freq, data, n_poly, print_fit=False)
       after_poly = data-poly_values
-      damped_fit = fit_model_damped_sin(short_freq, after_poly)
+      damped_fit = fit_model_damped_sin(short_freq, after_poly, previous_damped_params)
       damped = model_damped(short_freq, damped_fit)
+      for param, val in damped_fit.items():
+        previous_damped_params[param] = float(val)
     except:
       poly_values = [ 0 for j in range(len(short_freq)) ]
       after_poly = [ 0 for j in range(len(short_freq)) ]
       damped =[ 0 for j in range(len(short_freq)) ]
       poly_coeff = damped_fit = []
+   
 
     plt.clf()
     plt.subplot(2, 1, 1)
     plt.plot(short_freq, data, linewidth=0.5, label="This Spectrum")
     plt.plot(freq, mean_spectrum, linewidth=0.5, label="Mean Spectrum")
     plt.plot(short_freq, poly_values, linewidth=0.5, label="Polynomial Fit")
-    plt.ylabel("Temperature")
+    plt.ylabel("Temperature [K]")
     plt.xlim(lowf, highf)
     plt.ylim(ymin=0, ymax=10000)
     plt.legend()
     if len(poly_coeff) == 0:
-      plt.text(58, 6000, "Poly fit failed\n")
+      #plt.text(58, 6000, "Poly fit failed\n")
       poly_coeff_file.write(str(i)+" "+d[i]+" "+str(indexes[i])+" Poly fit failed\n")
     else:
       pstr = "" 
       for j, p in enumerate(poly_coeff):
         pstr += "p"+str(j)+": %.2e  " % p
-      plt.text(58, 6000, "Poly coeff  "+pstr)
+      #plt.text(58, 6000, "Poly coeff  "+pstr)
       poly_coeff_file.write(str(i)+" "+d[i]+" "+str(indexes[i])+" "+pstr+"\n")
  
     plt.title("#"+str(i)+"  "+d[i]+", "+str(indexes[i])+"  LST "+( "%.2f" % l[i] )+", Ant "+ant)
     
     plt.subplot(2, 1, 2)
-    plt.ylabel("Temperature")
+    plt.ylabel("Temperature [K]")
     plt.xlabel("Frequency [MHz]")
     plt.xlim(lowf, highf)
     plt.ylim(-300, 300)
@@ -280,13 +288,13 @@ def make_movie_spectra(acc_data, freq, d, l, indexes, ant):
     plt.plot(short_freq, damped, "g", linewidth=0.5, label="Damped Sin Fit")
     plt.legend()
     if len(damped_fit) == 0:
-      plt.text(50, -290, "Damped fit failed")
+      #plt.text(50, -290, "Damped fit failed")
       damped_sin_coeff_file.write(str(i)+" "+d[i]+" "+str(indexes[i])+" Damped fit failed\n")
     else:
       pstr = ""
       for param, val in damped_fit.items():
         pstr += "%s: %.2e   " % (param, val)
-      plt.text(42, -290, "Damped sin coeff  "+pstr)
+      #plt.text(42, -290, "Damped sin coeff  "+pstr)
       damped_sin_coeff_file.write(str(i)+" "+d[i]+" "+str(indexes[i])+" "+pstr+"\n")
     
     plt.savefig("spec"+str(i)+".png"); 
@@ -299,6 +307,7 @@ def make_movie_spectra(acc_data, freq, d, l, indexes, ant):
 
   poly_coeff_file.close()
   damped_sin_coeff_file.close()
+  spec_index_file.close()
 
 
 def plot_waterfall(acc_data, freq, fl, d):
@@ -353,7 +362,7 @@ n_poly = args.n_poly
 
 ant = "254A"
 
-spectra = Spectra("file_list.txt", "flag_db.txt", ant, lst_min=11, lst_max=12)
+spectra = Spectra("file_list.txt", "flag_db.txt", ant)
 accumulated_data, frequencies, lsts, days, indexes = spectra.good_data()
 print accumulated_data.shape[0], "spectra"
 
