@@ -4,6 +4,8 @@ import random
 import scipy.signal
 import scipy.optimize
 
+
+
 # Find the spectral index just by curve fitting
 def spectral_index(freq, temp):
     def S(x, C, si):
@@ -240,26 +242,111 @@ class Spectra(object):
       self.accumulated_data.data[i, :] = np.subtract(self.accumulated_data[i], scipy.signal.medfilt(self.accumulated_data[i], window)).data
 
   def flatten1(self):
-    dummy_fit = [ 4e07,  -2.3]
-    dummy_signal = dummy_fit[0]*(self.frequencies)**dummy_fit[1]
     
-    for i in range(10):
+    for i in range(self.accumulated_data.shape[0]):
       fit = spectral_index(self.frequencies, self.accumulated_data[i])
       signal = fit[0]*self.frequencies**fit[1]
-      self.accumulated_data.data[i, :] = np.add(np.subtract(self.accumulated_data.data[i], signal), dummy_signal)
+      self.accumulated_data.data[i, :] = np.subtract(self.accumulated_data.data[i], signal)
+
+  def median_smooth(self):
+    window = 9
+    for i in range(self.accumulated_data.shape[0]):
+      self.accumulated_data.data[i, :] = scipy.signal.medfilt(self.accumulated_data[i], window)
+
+  def poly_flatten_time(self):
+    for i in range(self.accumulated_data.shape[1]):
+      x = np.arange(self.accumulated_data.shape[0])
+      z = np.polyfit(x, self.accumulated_data[:, i], 3)
+      p = np.poly1d(z)     
+      self.accumulated_data.data[:, i] -= p(x)
+
 
   def random_sample(self, num):
 
-    good, b, c, d, e = self.good_data()
+    good, freq, lsts, days, indexes = self.good_data()
     if num > good.shape[0]:
       raise RuntimeError("Asked to select "+str(num)+" spectra. There are only "+str(len(good))+".")   
     else:
       selected = random.sample(np.arange(good.shape[0]), num)
 
-    return good[selected]	# Preserves mask
+    return good[selected], freq, lsts[selected], days[selected], indexes[selected]	# Preserves mask
+
+  def single(self, daytime, index):
+    for i in range(len(self.accumulated_data)):
+      if self.days[i] == daytime and self.indexes[i] == index:
+        return self.accumulated_data[i], self.frequencies, self.lsts[i], self.days[i], self.indexes[i]
+
+    raise RuntimeError("Failed to find single spectrum "+daytime+" "+str(index))
 
 
+"""
+sigma_factor = 3.5
+spectra = Spectra("file_list.txt", "flag_db.txt", "254A")
+spectra.poly_flatten_time()
+data, f, lsts, days, indexes = spectra.good_data()
+# 114 389
+bad = []
+for i in range(data.shape[1]):
+  std = np.ma.std(data[:, i])
+  mean = np.ma.mean(data[:, i])
+  for j in range(data.shape[0]):
+    if data[j, i] < mean-float(sigma_factor)*std or mean+float(sigma_factor)*std < data[j, i]:
+      if indexes[j] not in bad: bad.append(indexes[j])
+print bad; exit()
 
-#spectra = Spectra("file_list1.txt", "flag_db.txt", "254A")
-#spectra.good_data()
+specs = []
+move = "mv"
+si = np.loadtxt("spec_index.dat", dtype=np.int)
+for b in bad:
+  for i in range(len(si)):
+    if b == si[i][1]: 
+      if si[i][0] not in specs:
+        specs.append(si[i][0])
+        move += " spec"+str(si[i][0])+".png"
+move += " bad"
+os.system(move)
+"""
+"""
+import scipy.stats
+import matplotlib.pyplot as plt
+spectra = Spectra("file_list.txt", "flag_db.txt", "254A")
+s1 = spectra.single("2019-01-05_20H24M23S", 2654)[0]
+s2 = spectra.single("2019-02-10_10H00M03S", 2668)[0]
+
+s1 = scipy.signal.medfilt(s1, 9)
+s2 = scipy.signal.medfilt(s2, 9)
+
+
+def flat(a):
+  aa = a #a.compressed()
+
+  flatted = np.zeros(len(aa))
+  slope = (aa[-1]-aa[0])/(len(aa)-1)
+
+  for i in range(len(aa)):  
+    flatted[i] = aa[i]-(slope*i+aa[0])
+
+
+  return flatted
+
+
+window = 30
+res1 = []
+for i in range(0, len(s1)-window, 1):
+  res1.append(scipy.stats.kurtosis(flat(s1[i:i+window])))
+res2 = []
+for i in range(0, len(s2)-window, 1):
+  res2.append(scipy.stats.kurtosis(flat(s2[i:i+window])))
+
+
+plt.plot(res1, linewidth=0.5, label="bad")
+plt.plot(res2, linewidth=0.5, label="good")
+plt.legend()
+plt.title("Sliding kurtosis window, median-smoothed radiometry spectrum")
+plt.xlabel("Channel")
+plt.ylabel("Standard deviation")
+#plt.show()
+plt.savefig("slide_k.png")
+"""
+
 
