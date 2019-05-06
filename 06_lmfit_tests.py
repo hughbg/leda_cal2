@@ -192,6 +192,19 @@ def plot_spans(acc_data, fl, d):
 
   print
 
+def detect_rubble(data):
+  sigma_factor = 3.8
+  bad = []
+  for i in range(data.shape[1]):
+    std = np.ma.std(data[:, i])
+    mean = np.ma.mean(data[:, i])
+    for j in range(data.shape[0]):
+      if data[j, i] < mean-float(sigma_factor)*std or mean+float(sigma_factor)*std < data[j, i]:
+        if j not in bad: bad.append(j)
+
+  print "Bad ones:",
+  for b in bad: print b,
+  print
 
 # This routine generates all the images that go in the movie.
 # The movie is created with shell script "make_movie"
@@ -363,11 +376,15 @@ n_poly = args.n_poly
 ant = "254A"
 
 spectra = Spectra("file_list.txt", "flag_db.txt", ant)
+print spectra.accumulated_data.shape[0], "spectra in files"
 accumulated_data, frequencies, lsts, days, indexes = spectra.good_data()
-print accumulated_data.shape[0], "spectra"
+print accumulated_data.shape[0], "good spectra"
 
 # These three routines do specific things - all visualizations.
-make_movie_spectra(accumulated_data, frequencies, days, lsts, indexes, ant)
+#make_movie_spectra(accumulated_data, frequencies, days, lsts, indexes, ant)
+spectra.poly_flatten_time()
+accumulated_data, frequencies, lsts, days, indexes = spectra.good_data()
+detect_rubble(accumulated_data)
 #plot_spans(accumulated_data, days)
 #plot_waterfall(accumulated_data, frequencies, days)
 exit()
