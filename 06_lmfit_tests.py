@@ -381,7 +381,7 @@ accumulated_data, frequencies, lsts, days, indexes = spectra.good_data()
 print accumulated_data.shape[0], "good spectra"
 
 # These three routines do specific things - all visualizations.
-#make_movie_spectra(accumulated_data, frequencies, days, lsts, indexes, ant)
+make_movie_spectra(accumulated_data, frequencies, days, lsts, indexes, ant)
 spectra.poly_flatten_time()
 accumulated_data, frequencies, lsts, days, indexes = spectra.good_data()
 detect_rubble(accumulated_data)
