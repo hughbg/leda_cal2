@@ -3,7 +3,8 @@ import hickle, os
 import random
 import scipy.signal
 import scipy.optimize
-
+import scipy.io
+import matplotlib.pyplot as plt
 
 
 # Find the spectral index just by curve fitting
@@ -57,10 +58,11 @@ class Spectra(object):
     random.seed()
 
     self.days = []					# Generate a file name day/time for each spectrum - many spectra will have the same one (on the same day)
-    self.indexes = np.zeros(0, dtype=np.int)		# Just sequence number indexes into the original h5 file
+    self.file_indexes = np.zeros(0, dtype=np.int)	# Just sequence number indexes into the original h5 file
     self.lsts = np.zeros(0)				# LSTs
+    self.utcs = np.zeros(0)				
     self.dtv_times = np.zeros(0, dtype=np.bool)		# Times where DTV was detected and flagged
-
+    
     for index, line in enumerate(open(fname)):
       if line[0] == "#": continue
 
@@ -73,6 +75,7 @@ class Spectra(object):
           day_lsts = data[key]
           use_lst_indexes = np.arange(data[key].shape[0])[np.logical_and(data[key]>=lst_min, data[key]<=lst_max)]    # List of indexes of lsts within the limits
         if key == "indexes": day_indexes = data[key]
+        if key == "utcs": day_utcs = data[key]
         if key == ant+"_dtv_times": 
           dtv_times = data[key]
 
@@ -81,10 +84,13 @@ class Spectra(object):
 
       if len(day_indexes) != len(day_lsts):
         raise RuntimeError("Indexes and LSTs not same length in "+f)
+      if len(day_indexes) != len(day_utcs):
+        raise RuntimeError("Indexes and UTCs not same length in "+f)
 
 
-      # Turn the DTV times into an array like a mask, indicating the times, then 
-      # its is the length of the data, like the other arrays: lsts, indexes etc.
+
+      # Turn the DTV times into an 1-D array like a mask, indicating the times, then 
+      # it is the length of the data, like the other arrays: lsts, indexes etc.
       # dtv_times are a list of indexes (absolute) in the file.
       zeros = np.full(ant_data.shape[0], False, dtype=np.bool)
       zeros[[ i for i in range(len(day_indexes)) if day_indexes[i] in dtv_times ]] = True
@@ -96,7 +102,8 @@ class Spectra(object):
    
       self.days += [ os.path.basename(f)[11:-4] ]*ant_data.shape[0]		# Every spectrum gets a day tag
       self.lsts = np.append(self.lsts, day_lsts[use_lst_indexes])
-      self.indexes = np.append(self.indexes, day_indexes[use_lst_indexes])
+      self.utcs = np.append(self.utcs, day_utcs[use_lst_indexes])
+      self.file_indexes = np.append(self.file_indexes, day_indexes[use_lst_indexes])
       self.dtv_times = np.append(self.dtv_times, dtv_times[use_lst_indexes])
 
       # Add them to the big array
@@ -105,7 +112,11 @@ class Spectra(object):
       except:
         self.accumulated_data = ant_data
 
-      print "File", index, line[:-1], ant_data.shape[0], "spectra", "starts", self.accumulated_data.shape[0]-ant_data.shape[0], "ends", self.accumulated_data.shape[0], "LST", self.lsts[0], "-", self.lsts[-1]
+      if self.lsts.shape[0] > 0:
+        print "File", index, line[:-1], ant_data.shape[0], "spectra", "starts", self.accumulated_data.shape[0]-ant_data.shape[0], "ends", self.accumulated_data.shape[0], "LST", self.lsts[0], "-", self.lsts[-1]
+      else:         
+        print "File", index, line[:-1], ant_data.shape[0], "spectra", "starts", self.accumulated_data.shape[0]-ant_data.shape[0], "ends", self.accumulated_data.shape[0]
+     
 
     # These lines chop above 85MHz because April data doesn't have that for real.
     # Uncomment these lines for April data
@@ -121,8 +132,8 @@ class Spectra(object):
 
     self.days = np.array(self.days)
 
-    if len(self.days) != len(self.lsts) or len(self.days) != len(self.indexes) or len(self.days) != len(self.dtv_times):
-      raise RuntimeError("Days, LSTs, indexes not all same length "+str(len(self.days))+" "+str(len(self.lsts))+" "+str(len(self.indexes))+" "+str(len(self.dtv_times)))
+    if self.accumulated_data.shape[0] != len(self.days) or len(self.days) != len(self.lsts) or len(self.days) != len(self.utcs) or len(self.days) != len(self.file_indexes) or len(self.days) != len(self.dtv_times):
+      raise RuntimeError("Data, days, LSTs, UTCs, file_indexes not all same length "+str(len(self.days))+" "+str(len(self.lsts))+" "+str(len(self.utcs))+" "+str(len(self.file_indexes))+" "+str(len(self.dtv_times)))
 
 
   def load_flags_old(self, fname):
@@ -185,16 +196,17 @@ class Spectra(object):
 	    The LSTs for every spectra in accumulated_data. lsts[i]
 	    is the LST for spectrum accumulated_data[i]. "lsts" has
 	    the same length as the first dimension of accumulated_data.
+        utcs: float array
         days: array of strings
             The day/time on which every spectra were recorded.
 	    days[i] is the day/time for spectrum accumulated_data[i]. "days" has
             the same length as the first dimension of accumulated_data.
-        indexes: integer array
+        file_indexes: integer array
             For all spectra, the index within the h5 file where the spectrum is located.
 	    indexes[i] is the index for spectrum accumulated_data[i]. days[i] together
-            with indexes[i] uniquely specify where the spectrum accumulated_data[i] 
+            with file_indexes[i] uniquely specify where the spectrum accumulated_data[i] 
             is located - the h5 file, and the array index within that file.
-            "indexes" has the same length as the first dimension of accumulated_data.
+            "file_indexes" has the same length as the first dimension of accumulated_data.
 
 
     """
@@ -204,7 +216,7 @@ class Spectra(object):
     for i in range(len(self.days)):
       if self.days[i] in self.flags.keys():
         if "time_index" in self.flags[self.days[i]].keys():
-          if int(self.indexes[i]) in self.flags[self.days[i]]["time_index"]: flags.append(i)
+          if int(self.file_indexes[i]) in self.flags[self.days[i]]["time_index"]: flags.append(i)
 
     # Include dtv times
     for index in np.nonzero(self.dtv_times)[0]:
@@ -217,7 +229,11 @@ class Spectra(object):
 
     not_flagged = np.delete(np.arange(self.accumulated_data.shape[0]), flags)
 
-    return self.accumulated_data[not_flagged], self.frequencies, self.lsts[not_flagged], self.days[not_flagged], self.indexes[not_flagged]
+    data = self.accumulated_data[not_flagged]
+    print ( "%.2f%% masked" % (float(data.shape[0]*data.shape[1]-np.ma.MaskedArray.count(data))/(data.shape[0]*data.shape[1])*100) )
+
+    return self.accumulated_data[not_flagged], self.frequencies, self.lsts[not_flagged], self.utcs[not_flagged], self.days[not_flagged], self.file_indexes[not_flagged]
+		
 
   def bad_data(self):
     # Generate flag indexes (from flag database) to match data that was loaded
@@ -231,10 +247,13 @@ class Spectra(object):
     for index in np.nonzero(self.dtv_times)[0]:
       flags.append(index)
 
-    return self.accumulated_data[flags], self.frequencies, self.lsts[flags], self.days[flags], self.indexes[flags]
+    return self.accumulated_data[flags], self.frequencies, self.lsts[flags], self.utcs[not_flagged], self.days[flags], self.file_indexes[flags]
 
   def all_data(self):
-    return self.accumulated_data, self.frequencies, self.lsts, self.days, self.indexes
+    return self.accumulated_data, self.frequencies, self.lsts, self.utcs, self.days, self.file_indexes
+
+
+  # These flattening routines do not necessarily work if there are multiply days in the data
 
   def flatten(self):
     window = 9
@@ -247,6 +266,13 @@ class Spectra(object):
       fit = spectral_index(self.frequencies, self.accumulated_data[i])
       signal = fit[0]*self.frequencies**fit[1]
       self.accumulated_data.data[i, :] = np.subtract(self.accumulated_data.data[i], signal)
+
+  def si_fit(self):
+    
+    for i in range(self.accumulated_data.shape[0]):
+      fit = spectral_index(self.frequencies, self.accumulated_data[i])
+      signal = fit[0]*self.frequencies**fit[1]
+      self.accumulated_data.data[i, :] = signal
 
   def median_smooth(self):
     window = 9
@@ -263,20 +289,63 @@ class Spectra(object):
 
   def random_sample(self, num):
 
-    good, freq, lsts, days, indexes = self.good_data()
+    good, freq, lsts, days, file_indexes = self.good_data()
     if num > good.shape[0]:
       raise RuntimeError("Asked to select "+str(num)+" spectra. There are only "+str(len(good))+".")   
     else:
       selected = random.sample(np.arange(good.shape[0]), num)
 
-    return good[selected], freq, lsts[selected], days[selected], indexes[selected]	# Preserves mask
+    return good[selected], freq, lsts[selected], utcs[selected], days[selected], file_indexes[selected]	# Preserves mask
 
   def single(self, daytime, index):
     for i in range(len(self.accumulated_data)):
-      if self.days[i] == daytime and self.indexes[i] == index:
-        return self.accumulated_data[i], self.frequencies, self.lsts[i], self.days[i], self.indexes[i]
+      if self.days[i] == daytime and self.file_indexes[i] == index:
+        return self.accumulated_data[i], self.frequencies, self.lsts[i], self.utcs[selected], self.days[i], self.file_indexes[i]
 
     raise RuntimeError("Failed to find single spectrum "+daytime+" "+str(index))
+ 
+  def apply_matlab_mask(self):	
+	
+    data, frequencies, lsts, utcs, days, indexes = self.good_data()
+
+    print ( "%.2f%% masked" % (float(data.shape[0]*data.shape[1]-np.ma.MaskedArray.count(data))/(data.shape[0]*data.shape[1])*100) )
+    index = 0
+    while index < len(days):
+      start = index
+      # Find the end
+      while index < len(days) and days[index] == days[start]: index += 1
+    
+      if os.path.exists("../../rubble/outriggers_"+days[start]+"/mask.mat"):
+        print "Apply matlab mask to", days[start], start, "to", index
+        mask = np.transpose(scipy.io.loadmat("../../rubble/outriggers_"+days[start]+"/mask.mat")["Mask1"])
+        freq = scipy.io.loadmat("../../rubble/outriggers_"+days[start]+"/spec.mat")["frequencies"][0]
+ 
+        if len(frequencies) != len(freq):
+          print frequencies, freq
+          raise RuntimeError("Number of frequencies not the same in mask "+str(len(frequencies))+" "+str(len(freq)))
+        for i in range(len(frequencies)): 
+          if abs(int(frequencies[i]*1e6)-int(freq[i]*1e6)) > 1:
+            raise RuntimeError("Frequencies don't match in apply_matlab_mask "+str(frequencies[i])+" "+str(freq[i]))
+        if mask.shape[0] != index-start:
+          raise RuntimeError("Mask is the wrong shape in apply_matlab_mask. "+str(mask.shape[0])+" "+str(index-start))
+
+        data[start:index][mask==0] = np.ma.masked
+        #plt.figure(figsize=(20,20)); plt.imshow(mask,aspect="auto"); plt.savefig("x.png"); plt.clf(); plt.imshow(data); plt.savefig("y.png"); exit()
+        print ( "%.2f%% masked" % (float(data.shape[0]*data.shape[1]-np.ma.MaskedArray.count(data))/(data.shape[0]*data.shape[1])*100) )
+
+      else: print "No matlab mask for", days[start]
+
+    return data, frequencies, lsts, utcs, days, indexes
+
+  def random_mask(self):
+    data, frequencies, lsts, days, file_indexes = self.good_data()
+    print ( "%.2f%% masked" % (float(data.shape[0]*data.shape[1]-np.ma.MaskedArray.count(data))/(data.shape[0]*data.shape[1])*100) )
+    for i in range(int(float(data.shape[0])*data.shape[1]/7)):
+      x = int(np.random.random()*(data.shape[0]-1))
+      y = int(np.random.random()*(data.shape[1]-1))
+      data[x, y] = np.ma.masked
+    print ( "%.2f%% masked" % (float(data.shape[0]*data.shape[1]-np.ma.MaskedArray.count(data))/(data.shape[0]*data.shape[1])*100) )
+    return data, frequencies, lsts, utcs, days, file_indexes
 
 
 """
