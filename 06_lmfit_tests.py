@@ -19,7 +19,7 @@ import scipy.io as sio
 import sys
 import bottleneck as bn
 from matplotlib.ticker import AutoMinorLocator
-
+from datetime import timedelta
 
 from lmfit import minimize, Parameters, fit_report
 
@@ -222,38 +222,102 @@ def detect_rubble(data):
   for b in bad: print b,
   print
 
+def calc_spaced(d, l):
+  spaced = np.zeros(len(d))
+  day_ticks = [ ( 0, d[0].split(" ")[0] ) ]
+
+  # UTC format 2018-05-04 03:35:19.715290
+  time_start = datetime.strptime(d[0], '%Y-%m-%d %H:%M:%S.%f')
+  for i in range(spaced.shape[0]):
+    time_after = datetime.strptime(d[i], '%Y-%m-%d %H:%M:%S.%f')
+    day_delta = (time_after-time_start).days
+    spaced[i] = day_delta+(l[i]-9)/5
+    if l[i]-9 < 0:
+      raise RuntimeError("LST minus 9 is negative "+str(l[i]))
+    if i > 0 and spaced[i] < spaced[i-1]:
+      raise RuntimeError("Spaced is out of order "+str(spaced[i-1])+" "+str(spaced[i])+" "+str(l[i-1])+" "+str(l[i]))
+
+    day = d[i].split(" ")[0]
+
+    if day_ticks[-1][1] != day:
+      day_ticks.append((spaced[i], day))
+
+  return spaced, day_ticks
+
+
 def make_movie_spectra_time(acc_data, freq, l, d, low, high):
 
-  if acc_data.shape[0] != len(l):
+  if acc_data[0].shape[0] != len(l):
     raise("LST array not the same length as number of spectra")
-  if acc_data.shape[1] != len(freq):
+  if acc_data[0].shape[1] != len(freq):
     raise("Invalid number of frequencies")
-  if acc_data.shape[0] != len(d):
+  if acc_data[0].shape[0] != len(d):
     raise("Invalid number of days")
 
   plt.clf()
-  plt.figure(figsize=(22, 8))
+  plt.figure(figsize=(12, 8))
+  np.savetxt("step2time.dat", np.array(list(zip(np.arange(acc_data[0].shape[0]), d))), fmt="%s")
 
-  np.savetxt("step2time.dat", np.array(list(zip(np.arange(acc_data.shape[0]), d))), fmt="%s")
+  print "Plotting", acc_data[0].shape[1], "across channels by time"
 
-  print "Plotting", acc_data.shape[1], "across channels by time"
-  for j in range(acc_data.shape[1]):
+  spaced = [ datetime.strptime(x, '%Y-%m-%d %H:%M:%S.%f') for x in d ]
+  start_time = datetime.strptime("2018-05-01", '%Y-%m-%d')
+  spaced = [ (x-start_time).total_seconds() for x in spaced ]
+
+  # This section creates ticks at the 1st of the month  
+  tick = [ str(start_time).split()[0] ]
+  tick_loc = [ 0 ]
+  for i in range(1, 400):
+    next_day = timedelta(days=i)
+
+    date_str = str(start_time+next_day).split()[0]
+    if date_str[-3:] == "-01":
+      tick_loc.append(next_day.total_seconds())  
+      tick.append(str(start_time+next_day).split()[0])
+
+  """
+  # This section creates ticks when there are discontinuities (hardwired)
+  tick = [ str(start_time).split()[0] ]
+  tick_loc = [ 0 ]
+  for i in range(1, 389):
+    next_day = timedelta(days=i)
+    if i in [ 20, 233, 265, 272, 285, 312, 327, 388 ]:
+      tick_loc.append(next_day.total_seconds())
+      tick.append(str(start_time+next_day).split()[0])
+  """
+
+  f = open("spaced.dat", "w")
+  for i in range(len(spaced)): f.write(str(spaced[i])+" "+str(d[i])+" "+str(acc_data[0][i, 0])+"\n")
+  f.close()
+
+  dmin = np.ma.min([ np.min(acc_data[0]), np.min(acc_data[1])])
+  dmax = np.ma.max([ np.max(acc_data[0]), np.max(acc_data[1])])
+
+  for j in range(acc_data[0].shape[0]):
     print j,; sys.stdout.flush()
 
-    ax = plt.subplot(1, 1, 1)
-    plt.plot(np.arange(acc_data.shape[0]), acc_data[:, j], linewidth=0.5)
-    plt.ylabel("Temperature [K]")
-    plt.xlabel("Time sequence")
+    #ax = plt.subplot(1, 1, 1)
+    #plt.plot(spaced, acc_data[0][:, j], "b.", markersize=0.5, label="252A")
+    plt.plot(spaced, acc_data[1][:, j], "r.", markersize=0.5, label="254A")
+    #plt.plot(spaced, [ 9700 for i in range(len(spaced))], "b.", markersize=0.5, label="cut")
+    plt.legend() 
+    plt.ylabel("Temperature [K]", fontsize=15)
+    plt.xlabel("\nDate", fontsize=15)
     plt.title("May 2018 - May 2019, night. Channel "+str(j)+", Frequency "+str(freq[j])+" MHz")
-    plt.ylim(ymin=low, ymax=high)
-    #plt.xticks(np.arange(0, acc_data.shape[0]+1, 5000.0))
-    #ax.minorticks_on()
-    #ax.xaxis.set_minor_locator(AutoMinorLocator(10))   
-    plt.savefig("time_"+str(j)+".pdf", dpi=150)
+    plt.xticks(tick_loc, tick, rotation="40", rotation_mode="anchor", ha="right")
+    #for k in range(len(tick)):		# Use this for ticks for discontinuities
+    #  if len(tick[k]) > 0: plt.plot([tick_loc[k], tick_loc[k]], [dmin, dmax], "r", linewidth=0.5)
+    #plt.ylim(ymin=low, ymax=high)
+    plt.ylim(ymin=0)
+    
+    plt.tight_layout()
+    plt.savefig("time_"+str(j)+".jpg", dpi=150)
     plt.clf()
     
-    np.savetxt("time_"+str(j)+".dat", np.array(list(zip(np.arange(acc_data.shape[0]), acc_data[:, j]))), fmt="%s")
-    
+    np.savetxt("time_"+str(j)+".dat", np.array(list(zip(np.arange(acc_data[0].shape[0]), acc_data[0][:, j]))), fmt="%s")
+    np.savetxt("time_"+str(j)+".dat", np.array(list(zip(np.arange(acc_data[1].shape[0]), acc_data[1][:, j]))), fmt="%s")
+
+    exit() 
   print
 
 
@@ -293,7 +357,7 @@ def make_movie_spectra(acc_data, freq, d, l, indexes, ant):
   subtract_poly = np.zeros((acc_data.shape[0], acc_data.shape[1]))
 
   # Loop through the data making a plot of each spectrum
-  for i in range(acc_data.shape[0]):
+  for i in range(0, acc_data.shape[0], 100):
 
     print i, indexes[i], "-----"
     spec_index_file.write(str(i)+" "+str(indexes[i])+"\n")
@@ -471,7 +535,7 @@ def flatten_night(a, d, l, u):	# Use a polynomial to flatten a night's data
     plt.title("Fit = "+( "%.1e" % stat )+" "+str(d)+" "+( "%.1f" % l )+" ")
     plt.savefig("fit"+( "%.2e" % stat )+".png")
     plt.clf()
-    print stat
+    #print stat
 
   c[x] -= p(x)
   return c
@@ -554,6 +618,8 @@ def bin_to_1MHz(bottom_f, filt, variance, channel_indexes):
 
 
 import argparse
+from datetime import datetime
+
 p = argparse.ArgumentParser(description='Plot antenna spectra and residuals')
 p.add_argument('-n',  '--n_poly', help='number of terms in log-poly to fit for residuals. Default 5', type=int,  default=3)
 args = p.parse_args()
@@ -562,11 +628,39 @@ n_poly = args.n_poly
 
 ant = "254A"
 
-spectra = Spectra("file_list.txt", "flag_db.txt", ant) #, lst_min=11.9, lst_max=11.915)
+
+spectra = Spectra("file_list.txt", "flag_db.txt", "254A") #, lst_min=11.9, lst_max=11.915)
 print spectra.accumulated_data.shape[0], "spectra in files"
 accumulated_data, frequencies, lsts, utcs, days, indexes = spectra.good_data()
+"""
+spectra1 = Spectra("file_list.txt", "flag_db.txt", "254A") #, lst_min=11.9, lst_max=11.915)
+print spectra.accumulated_data.shape[0], "spectra in files"
+accumulated_data1, frequencies, lsts, utcs, days, indexes = spectra1.good_data()
+print accumulated_data.shape, accumulated_data1.shape
+"""
+
+"""
+cache_file = "/mnt/md0/leda_cal2/cache_254A.hkl"
+cache = hkl.load(cache_file)
+print "Loaded from cache", cache_file
+accumulated_data = cache["accumulated_data"]
+frequencies = cache["frequencies"]
+lsts = cache["lsts"]
+utcs = cache["utcs"]
+days = cache["days"]
+indexes = cache["indexes"]
+print accumulated_data.shape[0], "good spectra"
+"""
+
+"""
+cache_file = "/mnt/md0/leda_cal2/cache_254A.hkl"
+cache = hkl.load(cache_file)
+print "Loaded from cache", cache_file
+accumulated_data1 = cache["accumulated_data"]
+"""
 
 print accumulated_data.shape[0], "good spectra"
+
 to_matlab = {
   "data" : np.transpose(np.ma.filled(accumulated_data, 0)),
   "indexes" : indexes,
@@ -576,9 +670,21 @@ to_matlab = {
 sio.savemat("spec.mat", to_matlab)
 
 
+# This section is for  splitting the data based on signal level
+
+
+split_value = 9700
+out_slots = np.ma.filled(accumulated_data.max(axis=1), 0)
+accumulated_data = accumulated_data[out_slots>split_value]
+lsts = lsts[out_slots>split_value]
+utcs = utcs[out_slots>split_value]
+days = days[out_slots>split_value]
+indexes = indexes[out_slots>split_value]
+print accumulated_data.shape[0], "good spectra after split"
+
 # These three routines do specific things - all visualizations.
-#make_movie_spectra_time(accumulated_data, frequencies, lsts, utcs, 0, 2200); exit()
-#make_movie_spectra(accumulated_data, frequencies, days, lsts, indexes, ant)
+#make_movie_spectra_time([accumulated_data, accumulated_data], frequencies, lsts, utcs, 0, 2200); exit()
+#make_movie_spectra(accumulated_data, frequencies, days, lsts, indexes, ant); exit()
 #spectra.poly_flatten_time()
 #accumulated_data, frequencies, lsts, days, indexes = spectra.good_data()
 #detect_rubble(accumulated_data)
@@ -595,6 +701,11 @@ sio.savemat("spec.mat", to_matlab)
 
 np.savetxt("accumulated_data.dat", np.ma.filled(accumulated_data, -1))
 hickle.dump(accumulated_data, "accumulated_data.hkl")
+
+# ------------------
+#This section of code does the weighted integrated spectrum, and calulates variance,
+#for the Bayseian analysis. bin_to_1Mhz() should be run on the result.
+
 
 # Variance over time, for each channel
 # First have to flatten the channels which is tricky when there are multiple days,
@@ -634,6 +745,10 @@ for i in range(accumulated_data.shape[1]):
 
 #make_movie_spectra_time(flattened_data, frequencies, lsts, -400, 400); exit()
 
+# --------------------
+# The rest is: do the integration of the spectra. Apply any flags, fit polynomials etc 
+# if desired.
+
 
 np.savetxt("flattened.dat", flattened_data[:, 1000])
 np.savetxt("fits.dat", fits)
@@ -644,7 +759,7 @@ bottom_frequency = frequencies[0]	# In case it gets flagged out, we must keep it
 aD = np.ma.mean(accumulated_data, axis=0)
 
 
-np.savetxt("integrated_spectrum.dat", np.array(list(zip(frequencies, np.ma.filled(aD, 0))))); exit()
+#np.savetxt("integrated_spectrum.dat", np.array(list(zip(frequencies, np.ma.filled(aD, 0))))); exit()
 
 # Get rid of flagged values. Does not alter aD which is used later
 filt = aD.compressed()-scipy.signal.medfilt(aD.compressed(), 9)
