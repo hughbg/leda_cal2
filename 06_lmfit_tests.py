@@ -246,7 +246,7 @@ def calc_spaced(d, l):
 
 
 def make_movie_spectra_time(acc_data, freq, l, d, low, high):
-
+  
   if acc_data[0].shape[0] != len(l):
     raise("LST array not the same length as number of spectra")
   if acc_data[0].shape[1] != len(freq):
@@ -317,7 +317,7 @@ def make_movie_spectra_time(acc_data, freq, l, d, low, high):
     np.savetxt("time_"+str(j)+".dat", np.array(list(zip(np.arange(acc_data[0].shape[0]), acc_data[0][:, j]))), fmt="%s")
     np.savetxt("time_"+str(j)+".dat", np.array(list(zip(np.arange(acc_data[1].shape[0]), acc_data[1][:, j]))), fmt="%s")
 
-    exit() 
+ 
   print
 
 
@@ -333,6 +333,24 @@ def make_movie_spectra(acc_data, freq, d, l, indexes, ant):
     raise("Days array not the same length as number of spectra")
   if acc_data.shape[0] != len(indexes):
     raise("Index array not the same length as number of spectra")
+
+  
+  """ 
+  start = 0
+  i = start
+  while d[i] == d[start]: i += 1
+  start = i
+  while d[i] == d[start]: 
+    print d[i]
+    i += 1
+  print freq[1250]
+  plt.title("One Night\n2019-01-02,  70.008MHz")
+  plt.xlabel("LST")
+  plt.ylabel("Temperature [K]")
+  plt.plot(l[start:i], acc_data[start:i, 1250])
+  plt.savefig("one_night.jpg", dpi=150); exit()
+  """
+
 
   print "Making movie images"
 
@@ -357,7 +375,7 @@ def make_movie_spectra(acc_data, freq, d, l, indexes, ant):
   subtract_poly = np.zeros((acc_data.shape[0], acc_data.shape[1]))
 
   # Loop through the data making a plot of each spectrum
-  for i in range(0, acc_data.shape[0], 100):
+  for i in range(0, acc_data.shape[0]):
 
     print i, indexes[i], "-----"
     spec_index_file.write(str(i)+" "+str(indexes[i])+"\n")
@@ -367,7 +385,7 @@ def make_movie_spectra(acc_data, freq, d, l, indexes, ant):
     #  sys.stdout.flush()
 
     # Make sure all nans are masked
-    data = acc_data[i]
+    data = acc_data[i];
     data.mask = np.logical_or(acc_data[i].mask, np.isnan(acc_data[i]))
 
     # Need to get rid of masked values 
@@ -440,7 +458,7 @@ def make_movie_spectra(acc_data, freq, d, l, indexes, ant):
     plt.plot(short_freq, after_poly-damped, linewidth=0.5)
     plt.tight_layout()
     
-    plt.savefig("spec"+str(i)+".png"); 
+    plt.savefig("spec"+str(i)+".jpg", dpi=150); 
 
     np.savetxt("spec"+str(i)+".dat", np.array(list(zip(short_freq, data))))
     np.savetxt("subtract_poly"+str(i)+".dat", np.array(list(zip(short_freq, after_poly))))
@@ -629,7 +647,7 @@ n_poly = args.n_poly
 ant = "254A"
 
 
-spectra = Spectra("file_list.txt", "flag_db.txt", "254A") #, lst_min=11.9, lst_max=11.915)
+spectra = Spectra("file_list.txt", "flag_db.txt", ant) #, lst_min=11.9, lst_max=11.915)
 print spectra.accumulated_data.shape[0], "spectra in files"
 accumulated_data, frequencies, lsts, utcs, days, indexes = spectra.good_data()
 """
@@ -672,7 +690,7 @@ sio.savemat("spec.mat", to_matlab)
 
 # This section is for  splitting the data based on signal level
 
-
+"""
 split_value = 9700
 out_slots = np.ma.filled(accumulated_data.max(axis=1), 0)
 accumulated_data = accumulated_data[out_slots>split_value]
@@ -681,10 +699,11 @@ utcs = utcs[out_slots>split_value]
 days = days[out_slots>split_value]
 indexes = indexes[out_slots>split_value]
 print accumulated_data.shape[0], "good spectra after split"
+"""
 
 # These three routines do specific things - all visualizations.
 #make_movie_spectra_time([accumulated_data, accumulated_data], frequencies, lsts, utcs, 0, 2200); exit()
-#make_movie_spectra(accumulated_data, frequencies, days, lsts, indexes, ant); exit()
+make_movie_spectra(accumulated_data, frequencies, days, lsts, indexes, ant); exit()
 #spectra.poly_flatten_time()
 #accumulated_data, frequencies, lsts, days, indexes = spectra.good_data()
 #detect_rubble(accumulated_data)
